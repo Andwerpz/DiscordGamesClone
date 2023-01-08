@@ -27,8 +27,8 @@ public class StateManager {
 
 		this.activeState = null;
 		//this.loadState = new LoadState(this, new SplashState(this));
-		//this.loadState = new LoadState(this, new MainMenuState(this));
-		this.loadState = new LoadState(this, new GameState(this));
+		this.loadState = new LoadState(this, new MainMenuState(this));
+		//this.loadState = new LoadState(this, new LobbyState(this));
 	}
 
 	public void buildBuffers() {
@@ -79,6 +79,11 @@ public class StateManager {
 		Shader.IMG_POST_PROCESS.enable();
 		this.outputColorMap.bind(GL_TEXTURE0);
 		screenQuad.render();
+	}
+
+	public void kill() {
+		this.activeState.kill();
+		this.loadState.kill();
 	}
 
 	public void mousePressed(int button) {

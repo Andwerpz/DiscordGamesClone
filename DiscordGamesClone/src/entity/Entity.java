@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 
 import graphics.Material;
+import graphics.TextureMaterial;
 import model.AssetManager;
 import model.Model;
 import util.Mat4;
@@ -72,7 +73,7 @@ public abstract class Entity {
 	}
 
 	protected void removeModelInstance(long modelInstanceID) {
-		if(!modelInstanceIDs.contains(modelInstanceID)) {
+		if (!modelInstanceIDs.contains(modelInstanceID)) {
 			return;
 		}
 		this.modelInstanceIDs.remove(modelInstanceID);

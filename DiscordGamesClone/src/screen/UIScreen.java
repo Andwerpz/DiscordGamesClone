@@ -27,6 +27,11 @@ public class UIScreen extends Screen {
 	private Texture geometryColorMap; // RGB: color, A: alpha
 	private Texture geometryColorIDMap; // RGB: colorID
 
+	private Framebuffer colorIDBuffer;
+	private Texture colorIDMap;
+
+	private boolean clearColorIDBufferOnRender = false;
+
 	public UIScreen() {
 		super();
 	}
@@ -53,7 +58,13 @@ public class UIScreen extends Screen {
 		this.geometryBuffer.setDrawBuffers(new int[] { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3, GL_COLOR_ATTACHMENT4 });
 		this.geometryBuffer.isComplete();
 
-		this.camera = new Camera(Mat4.orthographic(0, Main.windowWidth, 0, Main.windowHeight, -10, 10));
+		this.colorIDBuffer = new Framebuffer(Main.windowWidth, Main.windowHeight);
+		this.colorIDMap = new Texture(GL_RGBA, Main.windowWidth, Main.windowHeight, GL_RGBA, GL_FLOAT);
+		this.colorIDBuffer.bindTextureToBuffer(GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this.colorIDMap.getID());
+		this.colorIDBuffer.setDrawBuffers(new int[] { GL_COLOR_ATTACHMENT0 });
+		this.colorIDBuffer.isComplete();
+
+		this.camera = new Camera(Mat4.orthographic(0, Main.windowWidth, 0, Main.windowHeight, -1000, 1000));
 	}
 
 	public void setUIScene(int scene) {
@@ -61,19 +72,34 @@ public class UIScreen extends Screen {
 	}
 
 	public long getEntityIDAtMouse() {
-		long modelInstanceID = Model.convertRGBToID(geometryBuffer.sampleColorAtPoint((int) MouseInput.getMousePos().x, (int) MouseInput.getMousePos().y, GL_COLOR_ATTACHMENT4));
+		long modelInstanceID = Model.convertRGBToID(colorIDBuffer.sampleColorAtPoint((int) MouseInput.getMousePos().x, (int) MouseInput.getMousePos().y, GL_COLOR_ATTACHMENT0));
 		long entityID = Entity.getEntityIDFromModelID(modelInstanceID);
 		return entityID;
 	}
 
+	public void clearColorIDBuffer() {
+		this.colorIDBuffer.bind();
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
+
+	public void setClearColorIDBufferOnRender(boolean b) {
+		this.clearColorIDBufferOnRender = b;
+	}
+
 	@Override
 	public void render(Framebuffer outputBuffer) {
+		if (this.clearColorIDBufferOnRender) {
+			this.clearColorIDBuffer();
+		}
+
 		// -- RENDER UI --
 		this.geometryBuffer.bind();
 		glEnable(GL_DEPTH_TEST);
 		glDepthFunc(GL_LESS);
 		glEnable(GL_CULL_FACE);
 		glDisable(GL_BLEND);
+		//glEnable(GL_BLEND);
+		//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 		glClearDepth(1); // maximum value
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
 
@@ -92,7 +118,7 @@ public class UIScreen extends Screen {
 		Shader.SPLASH.enable();
 		Shader.SPLASH.setUniform1f("alpha", 1f);
 		geometryColorMap.bind(GL_TEXTURE0);
-		// geometryColorIDMap.bind(GL_TEXTURE0);
+		//geometryColorIDMap.bind(GL_TEXTURE0);
 		screenQuad.render();
 
 		// -- RENDER PROPER UI HITBOXES --
@@ -111,6 +137,21 @@ public class UIScreen extends Screen {
 		Shader.GEOMETRY.setUniform3f("view_pos", camera.getPos());
 		Model.renderModels(this.ui_scene);
 
+		// -- RENDER COLOR ID TO SAVE--
+		this.colorIDBuffer.bind();
+		glDisable(GL_DEPTH_TEST);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+		Shader.SPLASH.enable();
+		Shader.SPLASH.setUniform1f("alpha", 1f);
+		geometryColorIDMap.bind(GL_TEXTURE0);
+		screenQuad.render();
+
+	}
+
+	public Texture getColorIDMap() {
+		return this.geometryColorIDMap;
 	}
 
 }

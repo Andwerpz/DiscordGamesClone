@@ -5,6 +5,7 @@ import java.awt.Font;
 import audio.Sound;
 import entity.Entity;
 import graphics.Framebuffer;
+import graphics.Material;
 import graphics.Texture;
 import graphics.TextureMaterial;
 import input.Button;
@@ -22,6 +23,7 @@ import screen.PerspectiveScreen;
 import screen.Screen;
 import screen.UIScreen;
 import ui.UIElement;
+import ui.UIFilledRectangle;
 import util.FontUtils;
 import util.Mat4;
 import util.MathUtils;
@@ -29,11 +31,14 @@ import util.Vec3;
 
 public class MainMenuState extends State {
 
-	private static final float ROTATION_TIME = 40f;
-
 	private static final int BACKGROUND_SCENE = 0; // background, duh
-	private static final int STATIC_UI_SCENE = 1; // for unchanging parts of the ui like the logo
-	private static final int DYNAMIC_UI_SCENE = 2; // inputs and stuff
+
+	//this is dumb, i shouldn't have to use another render pass to do this.
+	//try fill color using opengl?
+	private static final int BACKGROUND_UI_SCENE = 1; //the blue discord background. 
+
+	private static final int STATIC_UI_SCENE = 2; // for unchanging parts of the ui like the logo
+	private static final int DYNAMIC_UI_SCENE = 3; // inputs and stuff
 
 	private PerspectiveScreen perspectiveScreen; // 3D background
 	private UIScreen uiScreen; // Menu UI
@@ -41,6 +46,14 @@ public class MainMenuState extends State {
 	private Sound menuMusic;
 
 	private long startTime;
+
+	private Vec3 lightGray = new Vec3(66, 69, 73).mul(1.0f / 255.0f);
+	private Vec3 lightBlue = new Vec3(114, 137, 218).mul(1.0f / 255.0f);
+
+	private float sideButtonBaseOffset = 30;
+	private float sideButtonMaxOffset = 150;
+	private float sideButtonOffset = sideButtonBaseOffset;
+	private int sideButtonWidth = (int) sideButtonMaxOffset;
 
 	public MainMenuState(StateManager sm) {
 		super(sm);
@@ -68,7 +81,7 @@ public class MainMenuState extends State {
 
 		this.drawMainMenu();
 
-		menuMusic = new Sound("csgo_main_menu.ogg", true);
+		menuMusic = new Sound("main_menu_music.ogg", true);
 		int menuMusicID = menuMusic.addSource();
 		Sound.setRelativePosition(menuMusicID, new Vec3(0));
 		Sound.setGain(menuMusicID, 0.3f);
@@ -83,56 +96,65 @@ public class MainMenuState extends State {
 	}
 
 	private void drawMainMenu() {
-		// -- DYNAMIC UI --
-		this.clearScene(DYNAMIC_UI_SCENE);
-		Button hostGame = new Button(150, 0, 200, 30, "btn_host_game", "Host Game", FontUtils.CSGOFont, 32, DYNAMIC_UI_SCENE);
-		hostGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		hostGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-
-		Button joinGame = new Button(150, 40, 200, 30, "btn_join_game", "Join Game", FontUtils.CSGOFont, 32, DYNAMIC_UI_SCENE);
-		joinGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		joinGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-
-		Button settings = new Button(150, 80, 200, 30, "btn_settings", "Settings", FontUtils.CSGOFont, 32, DYNAMIC_UI_SCENE);
-		settings.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		settings.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-
-		Button quitGame = new Button(150, 120, 200, 30, "btn_quit_game", "Quit Game", FontUtils.CSGOFont, 32, DYNAMIC_UI_SCENE);
-		quitGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		quitGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-
-		TextField tfHostPort = new TextField(370, 0, 180, 30, "tf_host_port", "Port", new Font("Dialogue", Font.PLAIN, 1), 16, DYNAMIC_UI_SCENE);
-		tfHostPort.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		tfHostPort.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-
-		TextField tfJoinIP = new TextField(370, 40, 180, 30, "tf_join_ip", "IP", new Font("Dialogue", Font.PLAIN, 1), 16, DYNAMIC_UI_SCENE);
-		tfJoinIP.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		tfJoinIP.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-
-		TextField tfJoinPort = new TextField(570, 40, 180, 30, "tf_join_port", "Port", new Font("Dialogue", Font.PLAIN, 1), 16, DYNAMIC_UI_SCENE);
-		tfJoinPort.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		tfJoinPort.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		// -- UI BACKGROUND --
+		this.clearScene(BACKGROUND_UI_SCENE);
+		UIFilledRectangle background = new UIFilledRectangle(0, 0, -1, Main.windowWidth, Main.windowHeight, BACKGROUND_UI_SCENE);
+		background.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		background.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		background.setMaterial(new Material(this.lightGray));
 
 		// -- STATIC UI --
 		this.clearScene(STATIC_UI_SCENE);
-		FilledRectangle csgoLogo = new FilledRectangle();
-		csgoLogo.setTextureMaterial(new TextureMaterial(new Texture("/cs_go_logo.png", Texture.VERTICAL_FLIP_BIT)));
-		Mat4 logoMat4 = Mat4.scale(700, 150, 1).mul(Mat4.translate(new Vec3(120, Main.windowHeight / 2, 0)));
-		Model.addInstance(csgoLogo, logoMat4, STATIC_UI_SCENE);
+		UIFilledRectangle csgoLogo = new UIFilledRectangle(120, 50, 0, 560, 80, new FilledRectangle(), STATIC_UI_SCENE);
+		csgoLogo.setTextureMaterial(new TextureMaterial(new Texture("/discord_logo.png", Texture.VERTICAL_FLIP_BIT)));
+		csgoLogo.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_TOP);
+		csgoLogo.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		// -- DYNAMIC UI --
+		this.clearScene(DYNAMIC_UI_SCENE);
+		Button hostGame = new Button(150, 0, 200, 30, "btn_host_game", "Host Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		hostGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		hostGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		Button joinGame = new Button(150, 40, 200, 30, "btn_join_game", "Join Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		joinGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		joinGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		Button settings = new Button(150, 80, 200, 30, "btn_settings", "Settings", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		settings.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		settings.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		Button quitGame = new Button(150, 120, 200, 30, "btn_quit_game", "Quit Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		quitGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		quitGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		TextField tfHostPort = new TextField(360, 0, 180, 30, "tf_host_port", "Port", FontUtils.ggsans, 16, DYNAMIC_UI_SCENE);
+		tfHostPort.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		tfHostPort.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		TextField tfJoinIP = new TextField(360, 40, 180, 30, "tf_join_ip", "IP", FontUtils.ggsans, 16, DYNAMIC_UI_SCENE);
+		tfJoinIP.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		tfJoinIP.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		TextField tfJoinPort = new TextField(550, 40, 180, 30, "tf_join_port", "Port", FontUtils.ggsans, 16, DYNAMIC_UI_SCENE);
+		tfJoinPort.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		tfJoinPort.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		Button rightSideButton = new Button((int) this.sideButtonOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_side", ">", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
+		rightSideButton.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+		rightSideButton.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 	}
 
 	private void drawSettingsMenu() {
 		// -- DYNAMIC UI --
 		this.clearScene(DYNAMIC_UI_SCENE);
-		Button settingsExit = new Button(100, 50, 200, 30, "btn_settings_exit", "Back", FontUtils.CSGOFont, 32, DYNAMIC_UI_SCENE);
+		Button settingsExit = new Button(100, 50, 200, 30, "btn_settings_exit", "Back", FontUtils.ggsans, 32, DYNAMIC_UI_SCENE);
 		settingsExit.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 		settingsExit.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
-		//InputManager.addInput("btn_settings_exit", settingsExit);
 
-		Button settingsToggleFullscreen = new Button(100, 100, 400, 30, "btn_settings_toggle_fullscreen", "Toggle Fullscreen", FontUtils.CSGOFont, 32, DYNAMIC_UI_SCENE);
+		Button settingsToggleFullscreen = new Button(100, 100, 400, 30, "btn_settings_toggle_fullscreen", "Toggle Fullscreen", FontUtils.ggsans, 32, DYNAMIC_UI_SCENE);
 		settingsToggleFullscreen.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 		settingsToggleFullscreen.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
-		//InputManager.addInput("btn_settings_toggle_fullscreen", settingsToggleFullscreen);
 
 		// -- STATIC UI --
 		this.clearScene(STATIC_UI_SCENE);
@@ -142,9 +164,22 @@ public class MainMenuState extends State {
 	public void update() {
 		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
 
+		if (Input.getInput("btn_side") != null) {
+			Button sideButton = (Button) Input.getInput("btn_side");
+			float diff = 0;
+			if (sideButton.isHovered()) {
+				diff = this.sideButtonMaxOffset - this.sideButtonOffset;
+			}
+			else {
+				diff = this.sideButtonBaseOffset - this.sideButtonOffset;
+			}
+			this.sideButtonOffset += diff * 0.1f;
+			sideButton.setFrameAlignmentOffset((int) this.sideButtonOffset, 0);
+			sideButton.align();
+		}
+
 		Entity.updateEntities();
 		Model.updateModels();
-		updateCamera();
 	}
 
 	@Override
@@ -155,15 +190,12 @@ public class MainMenuState extends State {
 		perspectiveScreen.setWorldScene(BACKGROUND_SCENE);
 		perspectiveScreen.render(outputBuffer);
 
+		uiScreen.setUIScene(BACKGROUND_UI_SCENE);
+		uiScreen.render(outputBuffer);
 		uiScreen.setUIScene(STATIC_UI_SCENE);
 		uiScreen.render(outputBuffer);
 		uiScreen.setUIScene(DYNAMIC_UI_SCENE);
 		uiScreen.render(outputBuffer);
-	}
-
-	private void updateCamera() {
-		perspectiveScreen.getCamera().setFacing(0, MathUtils.interpolate(0, 0, (float) Math.PI * 2f, ROTATION_TIME * 1000f, System.currentTimeMillis() - startTime));
-		perspectiveScreen.getCamera().setUp(new Vec3(0, 1, 0));
 	}
 
 	@Override
@@ -178,8 +210,8 @@ public class MainMenuState extends State {
 		switch (clickedButton) {
 		case "btn_host_game":
 			try {
-				int ip = Integer.parseInt(Input.getText("tf_host_port"));
-				this.sm.switchState(new GameState(this.sm));
+				int port = Integer.parseInt(Input.getText("tf_host_port"));
+				this.sm.switchState(new LobbyState(this.sm, null, port, true));
 			}
 			catch (NumberFormatException e) {
 				System.err.println("BAD PORT");
@@ -188,9 +220,9 @@ public class MainMenuState extends State {
 
 		case "btn_join_game":
 			try {
-				int ip = Integer.parseInt(Input.getText("tf_join_port"));
-				String port = Input.getText("tf_join_ip");
-				this.sm.switchState(new GameState(this.sm));
+				int port = Integer.parseInt(Input.getText("tf_join_port"));
+				String ip = Input.getText("tf_join_ip");
+				this.sm.switchState(new LobbyState(this.sm, ip, port, false));
 			}
 			catch (NumberFormatException e) {
 				System.err.println("BAD PORT");
