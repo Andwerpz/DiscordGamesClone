@@ -67,7 +67,7 @@ public class LobbyState extends State {
 	private int hostID;
 
 	private static String[] defaultAdjectives = { "autistic", "goofyass", "bitchass", "funny", "laughable", "puny", "disgusting", "enlightened" };
-	private static String[] defaultNouns = { "penis", "ballsack", "chair", "idiot", "gronk", "submarine", "cucumber", "urethra" };
+	private static String[] defaultNouns = { "penis", "ballsack", "chair", "idiot", "gronk", "submarine", "cucumber", "urethra", "bryan" };
 	private String nickname;
 
 	private Sound menuMusic;
@@ -202,11 +202,6 @@ public class LobbyState extends State {
 		this.uiScreen.kill();
 
 		this.menuMusic.kill();
-
-		this.disconnect();
-		if (this.hosting) {
-			this.stopHosting();
-		}
 	}
 
 	private void drawMainMenu() {
@@ -221,7 +216,7 @@ public class LobbyState extends State {
 		this.lobbyMainFramebuffer.isComplete();
 
 		this.backgroundTextures.add(new TextureMaterial(this.lobbyMainColorMap));
-		this.backgroundTextures.add(new TextureMaterial(new Texture("/mrbeast_fortnite.jpg", Texture.VERTICAL_FLIP_BIT)));
+		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/chess_with_mr_beast.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/astolfo 11.jpg", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/darjeeling.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/astolfo.png", Texture.VERTICAL_FLIP_BIT)));
@@ -380,7 +375,7 @@ public class LobbyState extends State {
 
 			this.transitionVels.set(i, vel);
 
-			if (Math.abs(vel) < 1f && xOffset < 1f) {
+			if (Math.abs(vel) < 4f && xOffset < 1f) {
 				rect.setZ(-1);
 				rect.setFrameAlignmentOffset(0, 0);
 
@@ -401,6 +396,15 @@ public class LobbyState extends State {
 
 		if (this.client.hasPlayerInfoChanged()) {
 			this.drawLobbyMain();
+		}
+
+		if (this.client.getCurGame() != GameServer.LOBBY) {
+			int nextGame = this.client.getCurGame();
+			switch (nextGame) {
+			case GameServer.CHESS:
+				this.sm.switchState(new ChessState(this.sm, this.client));
+				break;
+			}
 		}
 
 		Entity.updateEntities();
@@ -443,7 +447,7 @@ public class LobbyState extends State {
 		Input.inputsReleased(uiScreen.getEntityIDAtMouse());
 		String clickedButton = Input.getClicked();
 		switch (clickedButton) {
-		case "btn_right_side":
+		case "btn_right_side": {
 			this.curBackgroundIndex++;
 			this.curBackgroundIndex %= this.backgroundTextures.size();
 
@@ -456,8 +460,9 @@ public class LobbyState extends State {
 			this.transitionVels.add(0f);
 			this.transitionZ++;
 			break;
+		}
 
-		case "btn_left_side":
+		case "btn_left_side": {
 			this.curBackgroundIndex--;
 			this.curBackgroundIndex += this.backgroundTextures.size();
 			this.curBackgroundIndex %= this.backgroundTextures.size();
@@ -471,8 +476,9 @@ public class LobbyState extends State {
 			this.transitionVels.add(0f);
 			this.transitionZ++;
 			break;
+		}
 
-		case "btn_set_nickname":
+		case "btn_set_nickname": {
 			String newNickname = Input.getText("tf_set_nickname");
 			if (newNickname.length() != 0) {
 				this.nickname = newNickname;
@@ -481,6 +487,29 @@ public class LobbyState extends State {
 			this.client.setNickname(this.nickname);
 			this.drawLobbyMain();
 			break;
+		}
+
+		case "btn_start_game": {
+			switch (this.curBackgroundIndex) {
+			case 1:
+				this.client.startGame(GameServer.CHESS);
+				break;
+
+			case 2:
+				this.client.startGame(GameServer.SCRABBLE);
+				break;
+			}
+			break;
+		}
+
+		case "btn_back_to_main_menu": {
+			this.disconnect();
+			if (this.hosting) {
+				this.stopHosting();
+			}
+			break;
+		}
+
 		}
 
 	}

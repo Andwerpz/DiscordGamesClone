@@ -87,19 +87,31 @@ public class StateManager {
 	}
 
 	public void mousePressed(int button) {
+		if (activeState == null) {
+			return;
+		}
 		activeState.mousePressed(button);
 	}
 
 	public void mouseReleased(int button) {
+		if (activeState == null) {
+			return;
+		}
 		activeState.mouseReleased(button);
 	}
 
 	public void keyPressed(int key) {
+		if (activeState == null) {
+			return;
+		}
 		activeState.keyPressed(key);
 		Input.inputsKeyPressed(key);
 	}
 
 	public void keyReleased(int key) {
+		if (activeState == null) {
+			return;
+		}
 		activeState.keyReleased(key);
 		Input.inputsKeyReleased(key);
 	}

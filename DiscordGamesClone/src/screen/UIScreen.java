@@ -148,6 +148,18 @@ public class UIScreen extends Screen {
 		geometryColorIDMap.bind(GL_TEXTURE0);
 		screenQuad.render();
 
+		//		// -- RENDER TO OUTPUT --
+		//		outputBuffer.bind();
+		//		glDisable(GL_DEPTH_TEST);
+		//		glEnable(GL_BLEND);
+		//		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		//
+		//		Shader.SPLASH.enable();
+		//		Shader.SPLASH.setUniform1f("alpha", 1f);
+		//		geometryColorMap.bind(GL_TEXTURE0);
+		//		geometryColorIDMap.bind(GL_TEXTURE0);
+		//		screenQuad.render();
+
 	}
 
 	public Texture getColorIDMap() {
