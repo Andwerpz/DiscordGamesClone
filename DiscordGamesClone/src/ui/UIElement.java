@@ -78,8 +78,10 @@ public abstract class UIElement extends Entity {
 
 	@Override
 	protected void _kill() {
+		this.unbind();
 		uiElements.remove(this);
-		for (UIElement e : this.boundElements) {
+		for (int i = 0; i < this.boundElements.size(); i += 0) {
+			UIElement e = this.boundElements.get(i);
 			e.kill();
 		}
 		this.__kill();
@@ -169,11 +171,11 @@ public abstract class UIElement extends Entity {
 			break;
 
 		case FROM_CENTER_LEFT:
-			this.x = rightBorder / 2 - this.xOffset;
+			this.x = leftBorder + (rightBorder - leftBorder) / 2 - this.xOffset;
 			break;
 
 		case FROM_CENTER_RIGHT:
-			this.x = rightBorder / 2 + this.xOffset;
+			this.x = leftBorder + (rightBorder - leftBorder) / 2 + this.xOffset;
 			break;
 		}
 
@@ -187,11 +189,11 @@ public abstract class UIElement extends Entity {
 			break;
 
 		case FROM_CENTER_BOTTOM:
-			this.y = topBorder / 2 - this.yOffset;
+			this.y = bottomBorder + (topBorder - bottomBorder) / 2 - this.yOffset;
 			break;
 
 		case FROM_CENTER_TOP:
-			this.y = topBorder / 2 + this.yOffset;
+			this.y = bottomBorder + (topBorder - bottomBorder) / 2 + this.yOffset;
 			break;
 		}
 	}
@@ -243,6 +245,14 @@ public abstract class UIElement extends Entity {
 		return this.alignedY + this.height;
 	}
 
+	public int getWidth() {
+		return this.width;
+	}
+
+	public int getHeight() {
+		return this.height;
+	}
+
 	public int getScene() {
 		return this.scene;
 	}
@@ -277,12 +287,30 @@ public abstract class UIElement extends Entity {
 		}
 	}
 
-	public void bindElement(UIElement e) {
-		e.isBound = true;
-		this.boundElements.add(e);
-		e.parentElement = this;
+	//binds this element to another element
+	public void bind(UIElement e) {
+		this.isBound = true;
+		this.parentElement = e;
+		e.boundElements.add(this);
 
-		e.setZ(this.z + depthSpacing);
+		this.setZ(this.z + depthSpacing);
+	}
+
+	//if this element has a parent element, it unbinds itself
+	public void unbind() {
+		if (this.isBound()) {
+			this.getParent().boundElements.remove(this);
+			this.isBound = false;
+			this.parentElement = null;
+		}
+	}
+
+	public boolean isBound() {
+		return this.isBound;
+	}
+
+	public UIElement getParent() {
+		return this.isBound() ? this.parentElement : null;
 	}
 
 }

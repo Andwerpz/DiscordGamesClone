@@ -59,6 +59,8 @@ public class LobbyState extends State {
 	private GameServer server;
 	private GameClient client;
 
+	private boolean initiateNetworking;
+
 	private String ip;
 	private int port;
 	private boolean hosting;
@@ -128,6 +130,8 @@ public class LobbyState extends State {
 		this.nickname = adjective + " " + noun;
 
 		this.startTime = System.currentTimeMillis();
+
+		this.initiateNetworking = true;
 	}
 
 	@Override
@@ -144,20 +148,23 @@ public class LobbyState extends State {
 		Entity.killAll();
 
 		// -- NETWORKING --
-		this.client = new GameClient();
-		this.players = this.client.getPlayers();
+		if (this.initiateNetworking) {
+			this.client = new GameClient();
+			this.players = this.client.getPlayers();
 
-		if (this.hosting) {
-			this.startHosting();
-		}
-
-		for (int i = 0; i < 3; i++) {
-			if (this.connect()) {
-				break;
+			if (this.hosting) {
+				this.startHosting();
 			}
-		}
 
-		this.client.setNickname(this.nickname);
+			for (int i = 0; i < 3; i++) {
+				if (this.connect()) {
+					break;
+				}
+			}
+
+			this.client.setNickname(this.nickname);
+			this.initiateNetworking = false;
+		}
 
 		// -- BACKGROUND --
 		this.clearScene(PERSPECTIVE_BACKGROUND_SCENE);
@@ -402,7 +409,7 @@ public class LobbyState extends State {
 			int nextGame = this.client.getCurGame();
 			switch (nextGame) {
 			case GameServer.CHESS:
-				this.sm.switchState(new ChessState(this.sm, this.client));
+				this.sm.switchState(new ChessState(this.sm, this.client, this));
 				break;
 			}
 		}

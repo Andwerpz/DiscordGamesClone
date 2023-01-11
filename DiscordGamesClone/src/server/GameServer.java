@@ -39,6 +39,7 @@ public class GameServer extends Server {
 	private int curGame = LOBBY;
 
 	private boolean startingGame = false;
+	private boolean returnToMainLobby = false;
 
 	// -- CHESS -- 
 	//first two players to join a chess lobby will be the players
@@ -109,6 +110,10 @@ public class GameServer extends Server {
 			packetSender.write(this.curGame);
 		}
 
+		if (this.returnToMainLobby) {
+			packetSender.writeSectionHeader("return_to_main_lobby", 1);
+		}
+
 		packetSender.writeSectionHeader("host_id", 1);
 		packetSender.write(this.hostID);
 
@@ -125,7 +130,7 @@ public class GameServer extends Server {
 		//send list of chess games currently being played
 		// - ID of chess game
 		// - ID of players, -1 if no player
-		// - TODO send who is spectating the game
+		// - send who is spectating the game
 		// - TODO send current position so we can have a render on the select button
 		if (this.chessLobbyUpdates.size() != 0) {
 			packetSender.writeSectionHeader("chess_lobby_updates", this.chessLobbyUpdates.size());
@@ -140,6 +145,10 @@ public class GameServer extends Server {
 					ChessGame game = this.chessGames.get(chessGameID);
 					packetSender.write(game.getWhiteID());
 					packetSender.write(game.getBlackID());
+					packetSender.write(game.getSpectators().size());
+					for (int j : game.getSpectators()) {
+						packetSender.write(j);
+					}
 					break;
 
 				case DELETE:
@@ -177,6 +186,7 @@ public class GameServer extends Server {
 		serverMessages.clear();
 
 		this.startingGame = false;
+		this.returnToMainLobby = false;
 
 		this.chessLobbyUpdates.clear();
 		this.chessMoveUpdates.clear();
@@ -201,6 +211,11 @@ public class GameServer extends Server {
 				int whichGame = packetListener.readInt();
 				this.curGame = whichGame;
 				this.startingGame = true;
+				break;
+			}
+
+			case "return_to_main_lobby": {
+				this.returnToMainLobby = true;
 				break;
 			}
 			}
@@ -235,7 +250,7 @@ public class GameServer extends Server {
 				game.setBlackID(clientID);
 			}
 			else {
-				break;
+				game.addSpectator(clientID);
 			}
 			this.playerToChessGames.put(clientID, whichGame);
 			this.chessLobbyUpdates.put(whichGame, UPDATE);
@@ -251,7 +266,7 @@ public class GameServer extends Server {
 				game.setBlackID(-1);
 			}
 			else {
-				break;
+				game.removeSpectator(clientID);
 			}
 			this.playerToChessGames.remove(clientID);
 			if (game.getWhiteID() == -1 && game.getBlackID() == -1) {
@@ -275,6 +290,14 @@ public class GameServer extends Server {
 			break;
 		}
 		}
+	}
+
+	private void resetGameInfo() {
+		// -- CHESS --
+		this.chessGames.clear();
+		this.chessLobbyUpdates.clear();
+		this.chessMoveUpdates.clear();
+		this.playerToChessGames.clear();
 	}
 
 	@Override

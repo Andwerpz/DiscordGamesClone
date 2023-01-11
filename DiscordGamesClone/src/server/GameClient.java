@@ -20,13 +20,16 @@ public class GameClient extends Client {
 	private String nickname;
 
 	private int hostID;
+	private boolean isHost = false;
 
 	private boolean startingGame = false;
+	private boolean returnToMainLobby = false;
 	private int curGame = GameServer.LOBBY;
 
 	// -- CHESS --
 	private HashMap<Integer, ChessGame> chessGames;
 	private int chessCurGameID = -1;
+	private boolean chessIsSpectating = false;
 	private boolean chessCreateGame = false;
 
 	private boolean chessJoinGame = false;
@@ -51,6 +54,11 @@ public class GameClient extends Client {
 		this.chessGames = new HashMap<>();
 	}
 
+	//i don't like this, this is dumb
+	public void resetAllGameInfo() {
+		this.resetChessGameInfo();
+	}
+
 	@Override
 	public void _update() {
 
@@ -70,6 +78,11 @@ public class GameClient extends Client {
 			packetSender.writeSectionHeader("start_game", 1);
 			packetSender.write(this.curGame);
 			this.startingGame = false;
+		}
+
+		if (this.returnToMainLobby) {
+			packetSender.writeSectionHeader("return_to_main_lobby", 1);
+			this.returnToMainLobby = false;
 		}
 
 		// -- GAME SPECIFIC --
@@ -153,12 +166,18 @@ public class GameClient extends Client {
 
 			case "host_id": {
 				this.hostID = packetListener.readInt();
+				this.isHost = this.hostID == this.ID;
 				break;
 			}
 
 			case "start_game": {
 				int whichGame = packetListener.readInt();
 				this.curGame = whichGame;
+				break;
+			}
+
+			case "return_to_main_lobby": {
+				this.curGame = GameServer.LOBBY;
 				break;
 			}
 			}
@@ -194,12 +213,22 @@ public class GameClient extends Client {
 					ChessGame game = this.chessGames.get(whichGame);
 					int whiteID = packetListener.readInt();
 					int blackID = packetListener.readInt();
+					int spectatorAmt = packetListener.readInt();
 					game.setWhiteID(whiteID);
 					game.setBlackID(blackID);
 
+					game.getSpectators().clear();
+					for (int j = 0; j < spectatorAmt; j++) {
+						int nextID = packetListener.readInt();
+						game.addSpectator(nextID);
+					}
+
 					//check if server has put the client into a game
-					if (whiteID == this.ID || blackID == this.ID) {
+					if (whiteID == this.ID || blackID == this.ID || game.getSpectators().contains(this.ID)) {
 						this.chessCurGameID = whichGame;
+						if (game.getSpectators().contains(this.ID)) {
+							this.chessIsSpectating = true;
+						}
 					}
 					break;
 				}
@@ -207,6 +236,11 @@ public class GameClient extends Client {
 				case GameServer.DELETE: {
 					System.out.println("REMOVE GAME : " + whichGame);
 					this.chessGames.remove(whichGame);
+
+					if (this.chessCurGameID == whichGame) {
+						//leave the game, it's been deleted
+						this.chessLeaveGame();
+					}
 					break;
 				}
 				}
@@ -235,6 +269,25 @@ public class GameClient extends Client {
 			break;
 		}
 		}
+	}
+
+	public void resetChessGameInfo() {
+		this.chessGames = new HashMap<>();
+		chessCurGameID = -1;
+		chessIsSpectating = false;
+		chessCreateGame = false;
+
+		chessJoinGame = false;
+		chessJoinWhichGame = -1;
+
+		chessLeaveGame = false;
+
+		chessMakeMove = false;
+		chessMoveFrom = null;
+		chessMoveTo = null;
+
+		chessHasLobbyUpdates = false;
+		chessCurGameHasMoveUpdate = false;
 	}
 
 	public boolean chessCurGameHasMoveUpdate() {
@@ -268,6 +321,10 @@ public class GameClient extends Client {
 		return this.chessCurGameID;
 	}
 
+	public boolean chessIsSpectating() {
+		return this.chessIsSpectating;
+	}
+
 	public void chessMakeMove(int[] from, int[] to) {
 		this.chessMakeMove = true;
 		this.chessMoveFrom = from;
@@ -284,6 +341,7 @@ public class GameClient extends Client {
 
 	public void chessLeaveGame() {
 		this.chessLeaveGame = true;
+		this.chessIsSpectating = false;
 		this.chessCurGameID = -1;
 	}
 
@@ -296,6 +354,14 @@ public class GameClient extends Client {
 		return this.curGame;
 	}
 
+	public void returnToMainLobby() {
+		if (!this.isHost()) {
+			return;
+		}
+		this.returnToMainLobby = true;
+		this.curGame = GameServer.LOBBY;
+	}
+
 	public void startGame(int whichGame) {
 		if (this.hostID != this.ID) {
 			return;
@@ -306,6 +372,10 @@ public class GameClient extends Client {
 
 	public int getHostID() {
 		return this.hostID;
+	}
+
+	public boolean isHost() {
+		return this.isHost;
 	}
 
 	public boolean hasPlayerInfoChanged() {

@@ -12,15 +12,18 @@ public class ChessGame {
 	private int gameID;
 	private int whiteID, blackID;
 
-	private ArrayList<Integer> spectators;
+	private HashSet<Integer> spectators;
 
 	private Stack<ChessPosition> positions;
+	private Stack<int[][]> moves;
 
 	public ChessGame() {
 		this.positions = new Stack<>();
 		this.positions.add(new ChessPosition());
 
-		this.spectators = new ArrayList<>();
+		this.moves = new Stack<>();
+
+		this.spectators = new HashSet<>();
 
 		this.gameID = generateNewID();
 		chessGames.put(this.gameID, this);
@@ -69,6 +72,13 @@ public class ChessGame {
 		return this.positions.peek();
 	}
 
+	public int[][] getPrevMove() {
+		if (this.moves.size() == 0) {
+			return null;
+		}
+		return this.moves.peek();
+	}
+
 	public boolean performMove(int[] from, int[] to) {
 		ChessPosition nextPosition = new ChessPosition(this.getCurPosition());
 		if (!nextPosition.move(from, to)) {
@@ -76,11 +86,24 @@ public class ChessGame {
 			return false;
 		}
 		this.positions.push(nextPosition);
+		this.moves.push(new int[][] { from, to });
 		return true;
 	}
 
 	public boolean isLegalMove(int[] from, int[] to) {
 		return this.getCurPosition().isLegalMove(from, to);
+	}
+
+	public void addSpectator(int id) {
+		this.spectators.add(id);
+	}
+
+	public void removeSpectator(int id) {
+		this.spectators.remove(id);
+	}
+
+	public HashSet<Integer> getSpectators() {
+		return this.spectators;
 	}
 
 }

@@ -34,11 +34,26 @@ public class Vec4 {
 		this.w = a;
 	}
 
+	public Vec4 mul(float a) {
+		Vec4 result = new Vec4(this);
+		result.muli(a);
+		return result;
+	}
+
+	public Vec4 muli(float a) {
+		this.x *= a;
+		this.y *= a;
+		this.z *= a;
+		this.w *= a;
+		return this;
+	}
+
 	public FloatBuffer toFloatBuffer() {
 		float[] elements = new float[] { x, y, z, w };
 		return BufferUtils.createFloatBuffer(elements);
 	}
 
+	@Override
 	public String toString() {
 		return this.x + ", " + this.y + ", " + this.z + ", " + this.w;
 	}

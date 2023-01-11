@@ -18,6 +18,7 @@ import graphics.Texture;
 import graphics.TextureMaterial;
 import input.Button;
 import input.Input;
+import input.MouseInput;
 import input.TextField;
 import main.Main;
 import model.AssetManager;
@@ -29,6 +30,7 @@ import scene.Scene;
 import screen.PerspectiveScreen;
 import screen.UIScreen;
 import server.GameClient;
+import server.GameServer;
 import ui.Text;
 import ui.UIElement;
 import ui.UIFilledRectangle;
@@ -40,12 +42,26 @@ import util.Pair;
 import util.Triple;
 import util.Vec2;
 import util.Vec3;
+import util.Vec4;
 
 public class ChessState extends State {
+
+	//ok, we have a few things left to do:
+	// - Win Checking, more like telling the players when someone has won
+	// - Pawn Promotion - eh, who needs to underpromote anyways :shrug:
+	// - move preview dots DONE
+	// - previous move on board DONE
+	// - Move History Board
+	// - nice animations?
+	// - make lobby nicer?
 
 	private static final int BACKGROUND_UI_SCENE = 0;
 	private static final int STATIC_UI_SCENE = 1; // for unchanging parts of the ui like the logo
 	private static final int DYNAMIC_UI_SCENE = 2; // inputs and stuff
+	private static final int HELD_PIECE_SCENE = 3; //just for the held piece D:
+	private static final int BOARD_INFO_SCENE = 4; //move preview dots
+
+	private State mainLobbyState;
 
 	private UIScreen uiScreen; // Menu UI
 
@@ -58,6 +74,9 @@ public class ChessState extends State {
 
 	private Vec3 darkGreen = new Vec3(118, 150, 86).mul(1.0f / 255.0f);
 	private Vec3 lightGreen = new Vec3(238, 238, 210).mul(1.0f / 255.0f);
+
+	private Material yellowHighlight = new Material(new Vec4(186, 202, 68, 170).mul(1.0f / 255.0f));
+	private Material grayHighlight = new Material(new Vec4(66, 69, 73, 120).mul(1.0f / 255.0f));
 
 	private TextureMaterial backgroundTexture;
 
@@ -76,8 +95,13 @@ public class ChessState extends State {
 	private int boardSize = boardCellSize * 8;
 	private int boardBackgroundSize = boardSize + boardBackgroundMarginSize * 2;
 
+	private int toEdgeMargin = (Main.windowHeight - boardBackgroundSize) / 2;
+
+	private UIFilledRectangle chessBoardBackground;
+
 	private ChessGame curChessGame;
 	private int curChessGameID = -1;
+	private boolean chessIsSpectating = false;
 
 	private UIFilledRectangle[][] cellRects = new UIFilledRectangle[8][8];
 
@@ -111,9 +135,22 @@ public class ChessState extends State {
 	private int chessPieceHeldRow = 0;
 	private int chessPieceHeldCol = 0;
 
-	public ChessState(StateManager sm, GameClient client) {
+	private UIFilledRectangle heldPieceRect;
+
+	private Input leaveGameBtn;
+
+	private UIFilledRectangle spectatorBoard;
+
+	private UIFilledRectangle playerLabel, opponentLabel;
+
+	private UIFilledRectangle moveHistoryBoard;
+
+	private static TextureMaterial circleTexture;
+
+	public ChessState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm);
 
+		this.mainLobbyState = mainLobbyState;
 		this.client = client;
 	}
 
@@ -140,6 +177,10 @@ public class ChessState extends State {
 			ChessState.chessPieceTextures.put((byte) -ChessPosition.KNIGHT, new TextureMaterial(pieceImages.get(3)));
 			ChessState.chessPieceTextures.put((byte) -ChessPosition.ROOK, new TextureMaterial(pieceImages.get(4)));
 			ChessState.chessPieceTextures.put((byte) -ChessPosition.PAWN, new TextureMaterial(pieceImages.get(5)));
+		}
+
+		if (ChessState.circleTexture == null) {
+			ChessState.circleTexture = new TextureMaterial(new Texture("/chess/dot.png"));
 		}
 
 		Main.unlockCursor();
@@ -171,9 +212,17 @@ public class ChessState extends State {
 
 		// -- DYNAMIC UI --
 		this.clearScene(DYNAMIC_UI_SCENE);
-		Button createGameBtn = new Button(10 + lobbyBackgroundMargin, 10 + lobbyBackgroundMargin, 200, 30, "btn_create_game", "Create Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		Button createGameBtn = new Button(10, 10, 200, 30, "btn_create_game", "Create Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
 		createGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 		createGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+		createGameBtn.bind(lobbyBackground);
+
+		if (this.client.isHost()) {
+			Button returnToMainLobbyBtn = new Button(10 + createGameBtn.getWidth() + 10, 10, 200, 30, "btn_return_to_main_lobby", "Return To Lobby", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+			returnToMainLobbyBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+			returnToMainLobbyBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+			returnToMainLobbyBtn.bind(lobbyBackground);
+		}
 
 		// -- Game Selector Buttons --
 		int xOffset = this.lobbyBackgroundMargin + 10;
@@ -218,19 +267,28 @@ public class ChessState extends State {
 		background.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 		background.setTextureMaterial(this.backgroundTexture);
 
-		UIFilledRectangle chessBoardBackground = new UIFilledRectangle(0, 0, 0, this.boardBackgroundSize, this.boardBackgroundSize, BACKGROUND_UI_SCENE);
-		chessBoardBackground.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		chessBoardBackground.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
-		chessBoardBackground.setMaterial(new Material(this.gray));
+		this.chessBoardBackground = new UIFilledRectangle(0, 0, 0, this.boardBackgroundSize, this.boardBackgroundSize, BACKGROUND_UI_SCENE);
+		this.chessBoardBackground.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		this.chessBoardBackground.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		this.chessBoardBackground.setMaterial(new Material(this.gray));
 
 		// -- STATIC UI --
 		this.clearScene(STATIC_UI_SCENE);
 
 		// -- DYNAMIC UI --
 		this.clearScene(DYNAMIC_UI_SCENE);
-		Button leaveGameBtn = new Button(10, 10, 200, 30, "btn_leave_game", "Leave Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
-		leaveGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
-		leaveGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
+		this.leaveGameBtn = new Button(this.toEdgeMargin, this.toEdgeMargin, Main.windowWidth - this.chessBoardBackground.getRightBorder() - toEdgeMargin * 2, 30, "btn_leave_game", "Leave Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		this.leaveGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
+		this.leaveGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
+
+		// -- SPECTATOR BOARD --
+		this.drawSpectatorBoard();
+
+		// -- PLAYER LABELS --
+		this.drawPlayerLabels();
+
+		// -- MOVE HISTORY BOARD --
+		this.drawMoveHistoryBoard();
 
 		// -- CHESS PIECES AND BOARD --
 		for (int i = 0; i < 8; i++) { //numbers and letters
@@ -239,36 +297,38 @@ public class ChessState extends State {
 			Text letterText = new Text(offset, this.boardBackgroundMarginSize / 2, (char) ('a' + i) + "", FontUtils.ggsans.deriveFont(Font.BOLD), 16, Color.WHITE, DYNAMIC_UI_SCENE);
 			letterText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 			letterText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
-			chessBoardBackground.bindElement(letterText);
+			letterText.bind(chessBoardBackground);
 
 			Text numberText = new Text(this.boardBackgroundMarginSize / 2, offset, (i + 1) + "", FontUtils.ggsans.deriveFont(Font.BOLD), 16, Color.WHITE, DYNAMIC_UI_SCENE);
 			numberText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 			numberText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
-			chessBoardBackground.bindElement(numberText);
+			numberText.bind(chessBoardBackground);
 		}
 
-		long curMs = System.currentTimeMillis();
 		byte[][] board = this.curChessGame.getCurPosition().board;
 
 		for (int i = 0; i < 8; i++) {
 			for (int j = 0; j < 8; j++) {
 				int xOffset = this.boardBackgroundMarginSize + j * this.boardCellSize;
 				int yOffset = this.boardBackgroundMarginSize + i * this.boardCellSize;
-				Material color = new Material((i + j) % 2 == 0 ? this.darkGreen : this.lightGreen);
+				Material color = new Material((i + j) % 2 == 1 ? this.darkGreen : this.lightGreen);
 
 				UIFilledRectangle boardCell = new UIFilledRectangle(xOffset, yOffset, 0, this.boardCellSize, this.boardCellSize, STATIC_UI_SCENE);
 				boardCell.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 				boardCell.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
 				boardCell.setMaterial(color);
 
-				chessBoardBackground.bindElement(boardCell);
+				if (!this.isWhite) {
+					boardCell.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+					boardCell.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+				}
+
+				boardCell.bind(chessBoardBackground);
 
 				this.cellRects[i][j] = boardCell;
 				this.cellBaseOffsets[i][j] = new Vec2(xOffset, yOffset);
 				this.cellOffsets[i][j] = new Vec2(0, 0);
 				this.cellVels[i][j] = new Vec2(0, 0);
-
-				this.cellAccels.add(new Triple<Long, int[], Vec2>(curMs + (i + j) * 50, new int[] { i, j }, new Vec2(-3, 10).setLength(10)));
 
 				if (board[i][j] != 0) {
 					TextureMaterial pieceTexture = ChessState.chessPieceTextures.get(board[i][j]);
@@ -277,8 +337,7 @@ public class ChessState extends State {
 					pieceRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 					pieceRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
 					pieceRect.setTextureMaterial(pieceTexture);
-
-					boardCell.bindElement(pieceRect);
+					pieceRect.bind(boardCell);
 
 					this.pieceRects[i][j] = pieceRect;
 				}
@@ -286,29 +345,177 @@ public class ChessState extends State {
 		}
 	}
 
+	private void drawSpectatorBoard() {
+		if (this.spectatorBoard != null) {
+			this.spectatorBoard.kill();
+		}
+
+		int spectatorBoardWidth = Main.windowWidth - this.chessBoardBackground.getRightBorder() - this.toEdgeMargin * 2;
+		int spectatorBoardHeight = leaveGameBtn.getBottomBorder() - this.toEdgeMargin * 2;
+		this.spectatorBoard = new UIFilledRectangle(this.toEdgeMargin, this.toEdgeMargin, 0, spectatorBoardWidth, spectatorBoardHeight, BACKGROUND_UI_SCENE);
+		this.spectatorBoard.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+		this.spectatorBoard.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+		this.spectatorBoard.setMaterial(new Material(this.lightGray));
+
+		Text spectatorBoardTitle = new Text(10, 10, "Spectators:", FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, STATIC_UI_SCENE);
+		spectatorBoardTitle.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+		spectatorBoardTitle.setContentAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+		spectatorBoardTitle.bind(this.spectatorBoard);
+
+		Text prevText = spectatorBoardTitle;
+		int spectatorTextLineSpacing = 10;
+
+		for (int id : this.client.chessGetCurGame().getSpectators()) {
+			String spectatorNick = this.client.getPlayers().get(id);
+
+			Text spectatorText = new Text(10, prevText.getYOffset() + prevText.getHeight() + spectatorTextLineSpacing, spectatorNick, FontUtils.ggsans, 16, Color.WHITE, STATIC_UI_SCENE);
+			spectatorText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+			spectatorText.setContentAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+			spectatorText.bind(this.spectatorBoard);
+
+			prevText = spectatorText;
+		}
+	}
+
+	private void drawPlayerLabels() {
+		if (this.playerLabel != null) {
+			this.playerLabel.kill();
+		}
+		if (this.opponentLabel != null) {
+			this.opponentLabel.kill();
+		}
+
+		int playerID = this.isWhite ? this.curChessGame.getWhiteID() : this.curChessGame.getBlackID();
+		int opponentID = this.isWhite ? this.curChessGame.getBlackID() : this.curChessGame.getWhiteID();
+
+		String playerStr = playerID == -1 ? "Empty Slot" : this.client.getPlayers().get(playerID);
+		String opponentStr = opponentID == -1 ? "Empty Slot" : this.client.getPlayers().get(opponentID);
+
+		int labelWidth = this.chessBoardBackground.getLeftBorder() - this.toEdgeMargin * 2;
+
+		this.playerLabel = new UIFilledRectangle(this.toEdgeMargin, this.toEdgeMargin, 0, labelWidth, 30, BACKGROUND_UI_SCENE);
+		this.playerLabel.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		this.playerLabel.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		this.playerLabel.setMaterial(new Material(this.lightGray));
+
+		Text playerText = new Text(0, 0, playerStr, FontUtils.ggsans.deriveFont(Font.BOLD), 16, Color.WHITE, STATIC_UI_SCENE);
+		playerText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		playerText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		playerText.bind(this.playerLabel);
+
+		this.opponentLabel = new UIFilledRectangle(this.toEdgeMargin, this.toEdgeMargin, 0, labelWidth, 30, BACKGROUND_UI_SCENE);
+		this.opponentLabel.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+		this.opponentLabel.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.FROM_TOP);
+		this.opponentLabel.setMaterial(new Material(this.lightGray));
+
+		Text opponentText = new Text(0, 0, opponentStr, FontUtils.ggsans.deriveFont(Font.BOLD), 16, Color.WHITE, STATIC_UI_SCENE);
+		opponentText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		opponentText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		opponentText.bind(this.opponentLabel);
+	}
+
+	private void drawMoveHistoryBoard() {
+		//TODO
+	}
+
+	private void drawBoardInfo() {
+		this.clearScene(BOARD_INFO_SCENE);
+
+		// -- PREV MOVE HIGHLIGHTING --
+		if (this.curChessGame.getPrevMove() != null) {
+			int[][] prev = this.curChessGame.getPrevMove();
+			int[] from = prev[0];
+			int[] to = prev[1];
+
+			UIFilledRectangle fromCell = this.cellRects[from[0]][from[1]];
+			UIFilledRectangle toCell = this.cellRects[to[0]][to[1]];
+
+			UIFilledRectangle fromHighlight = new UIFilledRectangle(0, 0, 0, this.boardCellSize, this.boardCellSize, BOARD_INFO_SCENE);
+			fromHighlight.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+			fromHighlight.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+			fromHighlight.setMaterial(this.yellowHighlight);
+			fromHighlight.bind(fromCell);
+
+			UIFilledRectangle toHighlight = new UIFilledRectangle(0, 0, 0, this.boardCellSize, this.boardCellSize, BOARD_INFO_SCENE);
+			toHighlight.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+			toHighlight.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+			toHighlight.setMaterial(this.yellowHighlight);
+			toHighlight.bind(toCell);
+
+			//System.out.println(fromHighlight.getID());
+			//System.out.println(toHighlight.getID());
+		}
+
+		// -- AVAILABLE MOVE HIGHLIGHTING --
+		if (!this.inLobby && !this.chessIsSpectating && this.chessPieceHeld) {
+			for (int i = 0; i < 8; i++) {
+				for (int j = 0; j < 8; j++) {
+					if (!this.curChessGame.getCurPosition().isLegalMove(new int[] { this.chessPieceHeldRow, this.chessPieceHeldCol }, new int[] { i, j })) {
+						continue;
+					}
+
+					UIFilledRectangle movePreviewDot = new UIFilledRectangle(0, 0, 0, this.boardCellSize / 2, this.boardCellSize / 2, new FilledRectangle(), BOARD_INFO_SCENE);
+					movePreviewDot.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+					movePreviewDot.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+					movePreviewDot.setTextureMaterial(ChessState.circleTexture);
+					movePreviewDot.setMaterial(this.grayHighlight);
+					movePreviewDot.bind(this.cellRects[i][j]);
+				}
+			}
+		}
+	}
+
 	@Override
 	public void update() {
-		this.entityAtMouse = uiScreen.getEntityIDAtMouse();
 		Input.inputsHovered(this.entityAtMouse);
 
 		// -- NETWORKING --
-		if (this.inLobby) {
-			if (this.client.chessHasLobbyUpdates()) {
+		if (this.client.getCurGame() == GameServer.LOBBY) {
+			this.sm.switchState(this.mainLobbyState);
+		}
+
+		if (this.client.chessHasLobbyUpdates()) {
+			if (this.inLobby) {
 				this.drawLobby();
 			}
+			else {
+				this.drawSpectatorBoard();
+				this.drawPlayerLabels();
+			}
+		}
 
+		if (this.inLobby) {
 			if (this.client.chessGetCurGameID() != this.curChessGameID) { //server says that you're in a game
 				this.inLobby = false;
-
 				this.curChessGame = this.client.chessGetCurGame();
 				this.curChessGameID = this.client.chessGetCurGameID();
-				this.isWhite = this.client.chessGetCurGame().getWhiteID() == this.client.getID();
+
+				if (this.client.chessIsSpectating()) {
+					this.chessIsSpectating = true;
+					this.isWhite = true;
+				}
+				else {
+					this.chessIsSpectating = false;
+					this.isWhite = this.client.chessGetCurGame().getWhiteID() == this.client.getID();
+				}
+
 				this.drawChessBoard();
 			}
 		}
 		else {
+			if (this.client.chessGetCurGameID() == -1) { //server says that you're in the lobby
+				this.inLobby = true;
+				this.curChessGame = null;
+				this.curChessGameID = -1;
+
+				this.chessIsSpectating = false;
+				this.isWhite = false;
+
+				this.drawLobby();
+			}
 			if (this.client.chessCurGameHasMoveUpdate()) {
 				this.drawChessBoard();
+				this.drawBoardInfo();
 			}
 		}
 
@@ -335,6 +542,12 @@ public class ChessState extends State {
 				this.cellVels[r][c].addi(accel);
 			}
 
+			if (this.chessPieceHeld) {
+				Vec2 mousePos = MouseInput.getMousePos();
+				this.heldPieceRect.setFrameAlignmentOffset((int) mousePos.x, (int) mousePos.y);
+				this.heldPieceRect.align();
+			}
+
 		}
 
 		Entity.updateEntities();
@@ -347,8 +560,18 @@ public class ChessState extends State {
 		uiScreen.render(outputBuffer);
 		uiScreen.setUIScene(STATIC_UI_SCENE);
 		uiScreen.render(outputBuffer);
+
+		this.entityAtMouse = uiScreen.getEntityIDAtMouse();
+
+		uiScreen.setUIScene(BOARD_INFO_SCENE);
+		uiScreen.render(outputBuffer);
 		uiScreen.setUIScene(DYNAMIC_UI_SCENE);
 		uiScreen.render(outputBuffer);
+
+		if (this.chessPieceHeld) {
+			uiScreen.setUIScene(HELD_PIECE_SCENE);
+			uiScreen.render(outputBuffer);
+		}
 	}
 
 	@Override
@@ -358,17 +581,29 @@ public class ChessState extends State {
 		//picking up a chess piece
 		if (!this.inLobby) {
 
-			if (!this.chessPieceHeld) {
+			if (!this.chessPieceHeld && !this.chessIsSpectating) {
 				for (int i = 0; i < 8; i++) {
 					for (int j = 0; j < 8; j++) {
 						byte pieceID = this.curChessGame.getCurPosition().board[i][j];
 						if (pieceID == 0 || (pieceID < 0 && this.isWhite) || (pieceID > 0 && !this.isWhite)) {
 							continue;
 						}
-						if (this.cellRects[i][j].getID() == this.entityAtMouse || this.pieceRects[i][j].getID() == this.entityAtMouse) {
+						if (this.cellRects[i][j].getID() == this.entityAtMouse) {
 							this.chessPieceHeld = true;
 							this.chessPieceHeldRow = i;
 							this.chessPieceHeldCol = j;
+
+							UIFilledRectangle pieceRect = this.pieceRects[this.chessPieceHeldRow][this.chessPieceHeldCol];
+							pieceRect.setFrameAlignmentOffset(Main.windowWidth * 10, Main.windowHeight * 10); //moving it offscreen
+							pieceRect.align();
+
+							TextureMaterial pieceTexture = ChessState.chessPieceTextures.get(pieceID);
+							this.heldPieceRect = new UIFilledRectangle(0, 0, 0, this.boardCellSize, this.boardCellSize, new FilledRectangle(), HELD_PIECE_SCENE);
+							this.heldPieceRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+							this.heldPieceRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+							this.heldPieceRect.setTextureMaterial(pieceTexture);
+
+							this.drawBoardInfo();
 						}
 					}
 				}
@@ -402,6 +637,11 @@ public class ChessState extends State {
 			this.client.chessJoinGame(gameID);
 			break;
 		}
+
+		case "btn_return_to_main_lobby": {
+			this.client.returnToMainLobby();
+			break;
+		}
 		}
 
 		if (!this.inLobby) {
@@ -412,7 +652,7 @@ public class ChessState extends State {
 				//find 'to' cell
 				for (int i = 0; i < 8; i++) {
 					for (int j = 0; j < 8; j++) {
-						if (this.cellRects[i][j].getID() == this.entityAtMouse || (this.pieceRects[i][j] != null && this.pieceRects[i][j].getID() == this.entityAtMouse)) {
+						if (this.cellRects[i][j].getID() == this.entityAtMouse) {
 							to = new int[] { i, j };
 						}
 					}
@@ -422,9 +662,18 @@ public class ChessState extends State {
 					this.drawChessBoard();
 				}
 				else {
-					//TODO reset held chess piece offset
+					//return the original piece back to its cell
+					UIFilledRectangle pieceRect = this.pieceRects[from[0]][from[1]];
+					pieceRect.setFrameAlignmentOffset(0, 0);
+					pieceRect.align();
 				}
+
+				this.heldPieceRect.kill();
+				this.heldPieceRect = null;
+
 				this.chessPieceHeld = false;
+
+				this.drawBoardInfo();
 			}
 		}
 
