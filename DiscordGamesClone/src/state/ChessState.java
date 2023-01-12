@@ -45,21 +45,30 @@ import util.Vec3;
 import util.Vec4;
 
 public class ChessState extends State {
-
 	//ok, we have a few things left to do:
-	// - Win Checking, more like telling the players when someone has won
-	// - Pawn Promotion - eh, who needs to underpromote anyways :shrug:
-	// - move preview dots DONE
-	// - previous move on board DONE
+	// -- IMPORTANT --
+	// - sound effects
+
+	// -- OTHER --
+	// - Pawn Underpromotion - eh, who needs to underpromote anyways :shrug:
 	// - Move History Board
 	// - nice animations?
 	// - make lobby nicer?
+	// - right click to draw arrows
+
+	// -- DONE --
+	// - move preview dots
+	// - previous move on board
+	// - on check make king square red
+	// - Win Checking, more like telling the players when someone has won
 
 	private static final int BACKGROUND_UI_SCENE = 0;
 	private static final int STATIC_UI_SCENE = 1; // for unchanging parts of the ui like the logo
 	private static final int DYNAMIC_UI_SCENE = 2; // inputs and stuff
 	private static final int HELD_PIECE_SCENE = 3; //just for the held piece D:
 	private static final int BOARD_INFO_SCENE = 4; //move preview dots
+	private static final int WIN_INFO_SCENE = 5;
+	private static final int WIN_INFO_TEXT_SCENE = 6;
 
 	private State mainLobbyState;
 
@@ -77,6 +86,7 @@ public class ChessState extends State {
 
 	private Material yellowHighlight = new Material(new Vec4(186, 202, 68, 170).mul(1.0f / 255.0f));
 	private Material grayHighlight = new Material(new Vec4(66, 69, 73, 120).mul(1.0f / 255.0f));
+	private Material redHighlight = new Material(new Vec4(255, 0, 0, 170).mul(1.0f / 255.0f));
 
 	private TextureMaterial backgroundTexture;
 
@@ -281,15 +291,6 @@ public class ChessState extends State {
 		this.leaveGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
 		this.leaveGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
 
-		// -- SPECTATOR BOARD --
-		this.drawSpectatorBoard();
-
-		// -- PLAYER LABELS --
-		this.drawPlayerLabels();
-
-		// -- MOVE HISTORY BOARD --
-		this.drawMoveHistoryBoard();
-
 		// -- CHESS PIECES AND BOARD --
 		for (int i = 0; i < 8; i++) { //numbers and letters
 			int offset = i * this.boardCellSize + this.boardCellSize / 2 + this.boardBackgroundMarginSize;
@@ -343,6 +344,21 @@ public class ChessState extends State {
 				}
 			}
 		}
+
+		// -- SPECTATOR BOARD --
+		this.drawSpectatorBoard();
+
+		// -- PLAYER LABELS --
+		this.drawPlayerLabels();
+
+		// -- MOVE HISTORY BOARD --
+		this.drawMoveHistoryBoard();
+
+		// -- BOARD INFO --
+		this.drawBoardInfo();
+
+		// -- WIN INFO --
+		this.drawWinInfo();
 	}
 
 	private void drawSpectatorBoard() {
@@ -441,9 +457,36 @@ public class ChessState extends State {
 			toHighlight.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 			toHighlight.setMaterial(this.yellowHighlight);
 			toHighlight.bind(toCell);
+		}
 
-			//System.out.println(fromHighlight.getID());
-			//System.out.println(toHighlight.getID());
+		// -- KING IN CHECK HIGHLIGHTING --
+		int[] wk = new int[2];
+		int[] bk = new int[2];
+		for (int i = 0; i < 8; i++) {
+			for (int j = 0; j < 8; j++) {
+				if (this.curChessGame.getCurPosition().board[i][j] == ChessPosition.KING) {
+					wk[0] = i;
+					wk[1] = j;
+				}
+				if (this.curChessGame.getCurPosition().board[i][j] == -ChessPosition.KING) {
+					bk[0] = i;
+					bk[1] = j;
+				}
+			}
+		}
+		if (this.curChessGame.getCurPosition().isWhiteInCheck()) {
+			UIFilledRectangle checkHighlight = new UIFilledRectangle(0, 0, 0, this.boardCellSize, this.boardCellSize, BOARD_INFO_SCENE);
+			checkHighlight.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+			checkHighlight.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+			checkHighlight.setMaterial(this.redHighlight);
+			checkHighlight.bind(this.cellRects[wk[0]][wk[1]]);
+		}
+		if (this.curChessGame.getCurPosition().isBlackInCheck()) {
+			UIFilledRectangle checkHighlight = new UIFilledRectangle(0, 0, 0, this.boardCellSize, this.boardCellSize, BOARD_INFO_SCENE);
+			checkHighlight.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+			checkHighlight.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+			checkHighlight.setMaterial(this.redHighlight);
+			checkHighlight.bind(this.cellRects[bk[0]][bk[1]]);
 		}
 
 		// -- AVAILABLE MOVE HIGHLIGHTING --
@@ -465,25 +508,51 @@ public class ChessState extends State {
 		}
 	}
 
+	private void drawWinInfo() {
+		this.clearScene(WIN_INFO_SCENE);
+
+		ChessPosition curPosition = this.curChessGame.getCurPosition();
+
+		String winString = "";
+		if (curPosition.whiteWin) {
+			winString = "White Wins";
+		}
+		else if (curPosition.blackWin) {
+			winString = "Black Wins";
+		}
+		else if (curPosition.stalemate) {
+			winString = "Stalemate";
+		}
+
+		if (winString.length() == 0) {
+			return;
+		}
+
+		UIFilledRectangle darkeningRect = new UIFilledRectangle(0, 0, 0, this.boardSize, this.boardSize, WIN_INFO_SCENE);
+		darkeningRect.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		darkeningRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		darkeningRect.setMaterial(new Material(new Vec4(0, 0, 0, 0.3f)));
+		darkeningRect.bind(this.chessBoardBackground);
+
+		Text winText = new Text(0, 0, winString, FontUtils.ggsans.deriveFont(Font.BOLD), 48, Color.WHITE, WIN_INFO_TEXT_SCENE);
+		winText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		winText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		winText.bind(this.chessBoardBackground);
+
+		UIFilledRectangle textBackground = new UIFilledRectangle(0, 0, 0, winText.getWidth() + 100, winText.getHeight() + 100, WIN_INFO_SCENE);
+		textBackground.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		textBackground.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		textBackground.setMaterial(new Material(this.lightGray));
+		textBackground.bind(darkeningRect);
+
+		textBackground.setZ(10);
+	}
+
 	@Override
 	public void update() {
-		Input.inputsHovered(this.entityAtMouse);
+		Input.inputsHovered(this.uiScreen.getEntityIDAtMouse());
 
 		// -- NETWORKING --
-		if (this.client.getCurGame() == GameServer.LOBBY) {
-			this.sm.switchState(this.mainLobbyState);
-		}
-
-		if (this.client.chessHasLobbyUpdates()) {
-			if (this.inLobby) {
-				this.drawLobby();
-			}
-			else {
-				this.drawSpectatorBoard();
-				this.drawPlayerLabels();
-			}
-		}
-
 		if (this.inLobby) {
 			if (this.client.chessGetCurGameID() != this.curChessGameID) { //server says that you're in a game
 				this.inLobby = false;
@@ -516,6 +585,20 @@ public class ChessState extends State {
 			if (this.client.chessCurGameHasMoveUpdate()) {
 				this.drawChessBoard();
 				this.drawBoardInfo();
+			}
+		}
+
+		if (this.client.getCurGame() == GameServer.LOBBY) {
+			this.sm.switchState(this.mainLobbyState);
+		}
+
+		if (this.client.chessHasLobbyUpdates()) {
+			if (this.inLobby) {
+				this.drawLobby();
+			}
+			else {
+				this.drawSpectatorBoard();
+				this.drawPlayerLabels();
 			}
 		}
 
@@ -572,6 +655,11 @@ public class ChessState extends State {
 			uiScreen.setUIScene(HELD_PIECE_SCENE);
 			uiScreen.render(outputBuffer);
 		}
+
+		uiScreen.setUIScene(WIN_INFO_SCENE);
+		uiScreen.render(outputBuffer);
+		uiScreen.setUIScene(WIN_INFO_TEXT_SCENE);
+		uiScreen.render(outputBuffer);
 	}
 
 	@Override

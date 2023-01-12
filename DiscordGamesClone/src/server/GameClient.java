@@ -191,10 +191,8 @@ public class GameClient extends Client {
 	}
 
 	private void readPacketChess(PacketListener packetListener, String sectionName, int elementAmt) {
-
 		switch (sectionName) {
 		case "chess_lobby_updates": {
-			System.out.println(sectionName);
 			this.chessHasLobbyUpdates = true;
 			for (int i = 0; i < elementAmt; i++) {
 				int updateType = packetListener.readInt();
@@ -203,7 +201,7 @@ public class GameClient extends Client {
 				case GameServer.CREATE: {
 					ChessGame game = new ChessGame();
 					game.setID(whichGame);
-					System.out.println("ADD GAME : " + whichGame);
+					System.out.println("ADD CHESS GAME : " + whichGame);
 					this.chessGames.put(whichGame, game);
 
 					//lack of break is intentional
@@ -234,7 +232,7 @@ public class GameClient extends Client {
 				}
 
 				case GameServer.DELETE: {
-					System.out.println("REMOVE GAME : " + whichGame);
+					System.out.println("REMOVE CHESS GAME : " + whichGame);
 					this.chessGames.remove(whichGame);
 
 					if (this.chessCurGameID == whichGame) {

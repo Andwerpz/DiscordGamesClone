@@ -68,7 +68,7 @@ public class LobbyState extends State {
 	private HashMap<Integer, String> players;
 	private int hostID;
 
-	private static String[] defaultAdjectives = { "autistic", "goofyass", "bitchass", "funny", "laughable", "puny", "disgusting", "enlightened" };
+	private static String[] defaultAdjectives = { "bryan", "autistic", "goofyass", "bitchass", "funny", "laughable", "puny", "disgusting", "enlightened" };
 	private static String[] defaultNouns = { "penis", "ballsack", "chair", "idiot", "gronk", "submarine", "cucumber", "urethra", "bryan" };
 	private String nickname;
 

@@ -259,6 +259,9 @@ public class GameServer extends Server {
 
 		case "chess_leave_game": {
 			ChessGame game = this.chessGames.get(this.playerToChessGames.get(clientID));
+			if (game == null) {
+				break;
+			}
 			if (game.getWhiteID() == clientID) {
 				game.setWhiteID(-1);
 			}
