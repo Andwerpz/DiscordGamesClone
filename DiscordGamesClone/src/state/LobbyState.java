@@ -224,7 +224,7 @@ public class LobbyState extends State {
 
 		this.backgroundTextures.add(new TextureMaterial(this.lobbyMainColorMap));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/chess_with_mr_beast.png", Texture.VERTICAL_FLIP_BIT)));
-		this.backgroundTextures.add(new TextureMaterial(new Texture("/astolfo 11.jpg", Texture.VERTICAL_FLIP_BIT)));
+		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/letter_league_v1.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/darjeeling.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/astolfo.png", Texture.VERTICAL_FLIP_BIT)));
 
@@ -410,6 +410,10 @@ public class LobbyState extends State {
 			switch (nextGame) {
 			case GameServer.CHESS:
 				this.sm.switchState(new ChessState(this.sm, this.client, this));
+				break;
+
+			case GameServer.SCRABBLE:
+				this.sm.switchState(new ScrabbleState(this.sm, this.client, this));
 				break;
 			}
 		}
