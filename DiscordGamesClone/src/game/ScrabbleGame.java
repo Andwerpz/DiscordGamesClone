@@ -26,7 +26,7 @@ public class ScrabbleGame {
 	//maybe call them cell attributes? it doesn't really matter tho
 	public static final int BONUS_START = 5;
 
-	private static int boardSize = 15;
+	public static int boardSize = 15;
 
 	public static HashSet<String> wordList;
 	public static HashMap<Character, Integer> letterScore = new HashMap<Character, Integer>() {
@@ -77,6 +77,14 @@ public class ScrabbleGame {
 
 		if (ScrabbleGame.wordList == null) {
 			ScrabbleGame.loadWordList();
+		}
+		
+		this.bonusBoard[boardSize / 2][boardSize / 2] = BONUS_START;
+		
+		for(int i = 0; i < boardSize; i++) {
+			for(int j = 0; j < boardSize; j++) {
+				this.bonusBoard[i][j] = (int) (Math.random() * 6);
+			}
 		}
 
 		//TODO generate bonus board

@@ -31,6 +31,8 @@ public class UIScreen extends Screen {
 	private Texture colorIDMap;
 
 	private boolean clearColorIDBufferOnRender = false;
+	
+	private float left, right, bottom, top, near, far;
 
 	public UIScreen() {
 		super();
@@ -63,8 +65,49 @@ public class UIScreen extends Screen {
 		this.colorIDBuffer.bindTextureToBuffer(GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this.colorIDMap.getID());
 		this.colorIDBuffer.setDrawBuffers(new int[] { GL_COLOR_ATTACHMENT0 });
 		this.colorIDBuffer.isComplete();
-
-		this.camera = new Camera(Mat4.orthographic(0, Main.windowWidth, 0, Main.windowHeight, -1000, 1000));
+		
+		this.left = 0;
+		this.right = Main.windowWidth;
+		this.bottom = 0;
+		this.top = Main.windowHeight;
+		this.near = -1000;
+		this.far = 1000;
+		
+		this.camera = new Camera(Mat4.orthographic(left, right, bottom, top, near, far));
+	}
+	
+	public void setLeft(float f) {
+		this.left = f;
+		this.updateCamera();
+	}
+	
+	public void setRight(float f) {
+		this.right = f;
+		this.updateCamera();
+	}
+	
+	public void setBottom(float f) {
+		this.bottom = f;
+		this.updateCamera();
+	}
+	
+	public void setTop(float f) {
+		this.top = f;
+		this.updateCamera();
+	}
+	
+	public void setNear(float f) {
+		this.near = f;
+		this.updateCamera();
+	}
+	
+	public void setFar(float f) {
+		this.far = f;
+		this.updateCamera();
+	}
+	
+	private void updateCamera() {
+		this.camera.setProjectionMatrix(Mat4.orthographic(left, right, bottom, top, near, far));
 	}
 
 	public void setUIScene(int scene) {

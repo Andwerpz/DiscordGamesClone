@@ -366,8 +366,8 @@ public class ChessState extends State {
 			this.spectatorBoard.kill();
 		}
 
-		int spectatorBoardWidth = Main.windowWidth - this.chessBoardBackground.getRightBorder() - this.toEdgeMargin * 2;
-		int spectatorBoardHeight = leaveGameBtn.getBottomBorder() - this.toEdgeMargin * 2;
+		float spectatorBoardWidth = Main.windowWidth - this.chessBoardBackground.getRightBorder() - this.toEdgeMargin * 2;
+		float spectatorBoardHeight = leaveGameBtn.getBottomBorder() - this.toEdgeMargin * 2;
 		this.spectatorBoard = new UIFilledRectangle(this.toEdgeMargin, this.toEdgeMargin, 0, spectatorBoardWidth, spectatorBoardHeight, BACKGROUND_UI_SCENE);
 		this.spectatorBoard.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 		this.spectatorBoard.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
@@ -407,7 +407,7 @@ public class ChessState extends State {
 		String playerStr = playerID == -1 ? "Empty Slot" : this.client.getPlayers().get(playerID);
 		String opponentStr = opponentID == -1 ? "Empty Slot" : this.client.getPlayers().get(opponentID);
 
-		int labelWidth = this.chessBoardBackground.getLeftBorder() - this.toEdgeMargin * 2;
+		float labelWidth = this.chessBoardBackground.getLeftBorder() - this.toEdgeMargin * 2;
 
 		this.playerLabel = new UIFilledRectangle(this.toEdgeMargin, this.toEdgeMargin, 0, labelWidth, 30, BACKGROUND_UI_SCENE);
 		this.playerLabel.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
