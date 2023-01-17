@@ -3,8 +3,10 @@ package server;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.TreeMap;
 
 import game.ChessGame;
+import game.ScrabbleGame;
 import util.Pair;
 import util.Vec3;
 
@@ -43,6 +45,20 @@ public class GameClient extends Client {
 	private boolean chessHasLobbyUpdates = false;
 	private boolean chessCurGameHasMoveUpdate = false;
 
+	// -- SCRABBLE --
+	private ScrabbleGame scrabbleGame;
+
+	private boolean scrabbleStartGame = false;
+	private boolean scrabbleIsGameStarting = false;
+	private boolean scrabbleIsGameEnding = false;
+
+	private ArrayList<Pair<int[], Character>> scrabbleIncomingMove;
+	private ArrayList<Pair<int[], Character>> scrabbleOutgoingMove;
+
+	private HashMap<Integer, Integer> scrabblePlayerScores;
+
+	private int scrabbleNextPlayer;
+
 	public GameClient() {
 		super();
 
@@ -52,11 +68,16 @@ public class GameClient extends Client {
 		this.serverMessages = new ArrayList<>();
 
 		this.chessGames = new HashMap<>();
+
+		this.scrabbleIncomingMove = new ArrayList<>();
+		this.scrabbleOutgoingMove = new ArrayList<>();
+		this.scrabblePlayerScores = new HashMap<>();
 	}
 
 	//i don't like this, this is dumb
 	public void resetAllGameInfo() {
 		this.resetChessGameInfo();
+		this.resetScrabbleGameInfo();
 	}
 
 	@Override
@@ -90,6 +111,26 @@ public class GameClient extends Client {
 		case GameServer.CHESS:
 			this.writePacketChess(packetSender);
 			break;
+
+		case GameServer.SCRABBLE:
+			this.writePacketScrabble(packetSender);
+			break;
+		}
+	}
+
+	private void writePacketScrabble(PacketSender packetSender) {
+		if (this.scrabbleOutgoingMove.size() != 0) {
+			packetSender.writeSectionHeader("scrabble_make_move", this.scrabbleOutgoingMove.size());
+			for (Pair<int[], Character> i : this.scrabbleOutgoingMove) {
+				packetSender.write(i.first);
+				packetSender.write(i.second);
+			}
+			this.scrabbleOutgoingMove.clear();
+		}
+
+		if (this.scrabbleStartGame) {
+			packetSender.writeSectionHeader("scrabble_start_game", 1);
+			this.scrabbleStartGame = false;
 		}
 	}
 
@@ -186,7 +227,51 @@ public class GameClient extends Client {
 			case GameServer.CHESS:
 				this.readPacketChess(packetListener, sectionName, elementAmt);
 				break;
+
+			case GameServer.SCRABBLE:
+				this.readPacketScrabble(packetListener, sectionName, elementAmt);
+				break;
 			}
+		}
+	}
+
+	private void readPacketScrabble(PacketListener packetListener, String sectionName, int elementAmt) {
+		switch (sectionName) {
+		case "scrabble_start_game": {
+			this.scrabbleGame = new ScrabbleGame();
+			this.scrabblePlayerScores.clear();
+			this.scrabbleIsGameStarting = true;
+			break;
+		}
+
+		case "scrabble_end_game": {
+			this.scrabbleIsGameEnding = true;
+			break;
+		}
+
+		case "scrabble_next_player": {
+			this.scrabbleNextPlayer = packetListener.readInt();
+			break;
+		}
+
+		case "scrabble_make_move": {
+			for (int i = 0; i < elementAmt; i++) {
+				int[] coords = packetListener.readNInts(2);
+				char letter = (char) packetListener.readInt();
+				this.scrabbleIncomingMove.add(new Pair<int[], Character>(coords, letter));
+			}
+			this.scrabbleGame.makeMove(this.scrabbleIncomingMove);
+			break;
+		}
+
+		case "scrabble_player_scores": {
+			for (int i = 0; i < elementAmt; i++) {
+				int playerID = packetListener.readInt();
+				int score = packetListener.readInt();
+				this.scrabblePlayerScores.put(playerID, score);
+			}
+			break;
+		}
 		}
 	}
 
@@ -267,6 +352,54 @@ public class GameClient extends Client {
 			break;
 		}
 		}
+	}
+
+	public void resetScrabbleGameInfo() {
+		this.scrabbleIncomingMove.clear();
+		this.scrabbleOutgoingMove.clear();
+		this.scrabbleIsGameStarting = false;
+	}
+
+	public boolean scrabbleIsGameStarting() {
+		if (!this.scrabbleIsGameStarting) {
+			return false;
+		}
+		this.scrabbleIsGameStarting = false;
+		return true;
+	}
+
+	public boolean scrabbleIsGameEnding() {
+		if (!this.scrabbleIsGameEnding) {
+			return false;
+		}
+		this.scrabbleIsGameEnding = false;
+		return true;
+	}
+
+	public void scrabbleStartGame() {
+		if (!this.isHost) {
+			return;
+		}
+		this.scrabbleStartGame = true;
+	}
+
+	public boolean scrabbleMakeMove(ArrayList<Pair<int[], Character>> move) {
+		if (this.getID() != this.scrabbleNextPlayer) {
+			return false;
+		}
+		int score = this.scrabbleGame.makeMove(move);
+		if (score == -1) {
+			return false;
+		}
+		this.scrabbleOutgoingMove.addAll(move);
+		return true;
+	}
+
+	public ArrayList<Pair<int[], Character>> scrabbleGetIncomingMove() {
+		ArrayList<Pair<int[], Character>> ret = new ArrayList<>();
+		ret.addAll(this.scrabbleIncomingMove);
+		this.scrabbleIncomingMove.clear();
+		return ret;
 	}
 
 	public void resetChessGameInfo() {

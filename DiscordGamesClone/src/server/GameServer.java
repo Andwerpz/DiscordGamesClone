@@ -6,6 +6,7 @@ import java.util.HashSet;
 
 import entity.Capsule;
 import game.ChessGame;
+import game.ScrabbleGame;
 import graphics.Material;
 import model.Model;
 import state.GameState;
@@ -49,6 +50,22 @@ public class GameServer extends Server {
 	private HashMap<Integer, Integer> chessLobbyUpdates; //lobby updates D:
 	private HashMap<Integer, Pair<Integer, int[][]>> chessMoveUpdates; //it just tells moves. pretty simple
 
+	// -- SCRABBLE --
+	//players will communicate with the server what moves they want to perform, and the server will calculate the score
+	//server communicates all players scores after every move
+
+	private ScrabbleGame scrabbleGame;
+
+	private HashMap<Integer, Integer> scrabblePlayerScores;
+
+	private ArrayList<Pair<int[], Character>> scrabbleNextMove;
+	private ArrayList<Integer> scrabblePlayerMoveOrder;
+	private int scrabbleMoveIndex;
+
+	private boolean scrabbleMovePerformed = false;
+	private boolean scrabbleStartingGame = false;
+	private boolean scrabbleEndingGame = false;
+
 	public GameServer(String ip, int port) {
 		super(ip, port);
 
@@ -64,6 +81,10 @@ public class GameServer extends Server {
 		this.chessGames = new HashMap<>();
 		this.chessLobbyUpdates = new HashMap<>();
 		this.chessMoveUpdates = new HashMap<>();
+
+		this.scrabbleNextMove = new ArrayList<>();
+		this.scrabblePlayerMoveOrder = new ArrayList<>();
+		this.scrabblePlayerScores = new HashMap<>();
 	}
 
 	@Override
@@ -122,8 +143,53 @@ public class GameServer extends Server {
 		case CHESS:
 			this.writePacketChess(packetSender, clientID);
 			break;
+
+		case SCRABBLE:
+			this.writePacketScrabble(packetSender, clientID);
+			break;
 		}
 
+	}
+
+	private void writePacketScrabble(PacketSender packetSender, int clientID) {
+		if (this.scrabbleStartingGame) {
+			packetSender.writeSectionHeader("scrabble_start_game", 1);
+
+			this.scrabbleGame = new ScrabbleGame();
+
+			this.scrabblePlayerMoveOrder = new ArrayList<>();
+			this.scrabblePlayerScores.clear();
+			for (int i : this.players) {
+				this.scrabblePlayerMoveOrder.add(i);
+				this.scrabblePlayerScores.put(i, 0);
+			}
+			this.scrabbleMoveIndex = 0;
+		}
+
+		if (this.scrabbleEndingGame) {
+			packetSender.writeSectionHeader("scrabble_end_game", 1);
+		}
+
+		if (this.scrabbleMovePerformed) {
+			packetSender.writeSectionHeader("scrabble_next_player", 1);
+			packetSender.write(this.scrabblePlayerMoveOrder.get(this.scrabbleMoveIndex));
+		}
+
+		if (this.scrabbleNextMove.size() != 0) {
+			packetSender.writeSectionHeader("scrabble_make_move", this.scrabbleNextMove.size());
+			for (Pair<int[], Character> i : this.scrabbleNextMove) {
+				packetSender.write(i.first);
+				packetSender.write(i.second);
+			}
+		}
+
+		if (this.scrabbleNextMove.size() != 0 || this.scrabbleStartingGame) {
+			packetSender.writeSectionHeader("scrabble_player_scores", this.scrabblePlayerScores.size());
+			for (int id : this.scrabblePlayerScores.keySet()) {
+				packetSender.write(id);
+				packetSender.write(this.scrabblePlayerScores.get(id));
+			}
+		}
 	}
 
 	private void writePacketChess(PacketSender packetSender, int clientID) {
@@ -190,6 +256,11 @@ public class GameServer extends Server {
 
 		this.chessLobbyUpdates.clear();
 		this.chessMoveUpdates.clear();
+
+		this.scrabbleStartingGame = false;
+		this.scrabbleEndingGame = false;
+		this.scrabbleNextMove.clear();
+		this.scrabbleMovePerformed = false;
 	}
 
 	@Override
@@ -216,6 +287,7 @@ public class GameServer extends Server {
 
 			case "return_to_main_lobby": {
 				this.returnToMainLobby = true;
+				this.resetGameInfo();
 				break;
 			}
 			}
@@ -225,7 +297,54 @@ public class GameServer extends Server {
 			case CHESS:
 				this.readPacketChess(packetListener, clientID, sectionName, elementAmt);
 				break;
+
+			case SCRABBLE:
+				this.readPacketScrabble(packetListener, clientID, sectionName, elementAmt);
+				break;
 			}
+		}
+	}
+
+	public void readPacketScrabble(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
+		switch (sectionName) {
+		case "scrabble_start_game": {
+			this.scrabbleStartingGame = true;
+			break;
+		}
+
+		case "scrabble_end_game": {
+			this.scrabbleEndingGame = true;
+			break;
+		}
+
+		case "scrabble_make_move": {
+			this.scrabbleNextMove.clear();
+			for (int i = 0; i < elementAmt; i++) {
+				int[] coords = packetListener.readNInts(2);
+				char letter = (char) packetListener.readInt();
+				this.scrabbleNextMove.add(new Pair<int[], Character>(coords, letter));
+			}
+
+			if (clientID != this.scrabblePlayerMoveOrder.get(this.scrabbleMoveIndex)) {
+				//this player shouldn't be moving right now
+				this.scrabbleNextMove.clear();
+				break;
+			}
+
+			//play the move and figure out the score
+			int score = this.scrabbleGame.makeMove(this.scrabbleNextMove);
+			if (score == -1) {
+				//the move is invalid
+				this.scrabbleNextMove.clear();
+				break;
+			}
+
+			//update, and move on to the next player
+			this.scrabblePlayerScores.put(clientID, this.scrabblePlayerScores.get(clientID) + score);
+			this.scrabbleMoveIndex = (this.scrabbleMoveIndex + 1) % this.scrabblePlayerMoveOrder.size();
+			this.scrabbleMovePerformed = true;
+			break;
+		}
 		}
 	}
 
@@ -296,6 +415,17 @@ public class GameServer extends Server {
 	}
 
 	private void resetGameInfo() {
+		this.resetChessGameInfo();
+		this.resetScrabbleGameInfo();
+	}
+
+	private void resetScrabbleGameInfo() {
+		this.scrabblePlayerScores.clear();
+		this.scrabbleMovePerformed = false;
+		this.scrabbleStartingGame = false;
+	}
+
+	private void resetChessGameInfo() {
 		// -- CHESS --
 		this.chessGames.clear();
 		this.chessLobbyUpdates.clear();

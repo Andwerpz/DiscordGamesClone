@@ -27,6 +27,7 @@ public class ScrabbleGame {
 	public static final int BONUS_START = 5;
 
 	public static int boardSize = 15;
+	public static int handSize = 7;
 
 	public static HashSet<String> wordList;
 	public static HashMap<Character, Integer> letterScore = new HashMap<Character, Integer>() {
@@ -78,17 +79,11 @@ public class ScrabbleGame {
 		if (ScrabbleGame.wordList == null) {
 			ScrabbleGame.loadWordList();
 		}
-		
-		this.bonusBoard[boardSize / 2][boardSize / 2] = BONUS_START;
-		
-		for(int i = 0; i < boardSize; i++) {
-			for(int j = 0; j < boardSize; j++) {
-				this.bonusBoard[i][j] = (int) (Math.random() * 6);
-			}
-		}
 
-		//TODO generate bonus board
-
+		//generate bonus board
+		this.bonusBoard = new int[][] { { 4, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 4 }, { 0, 3, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0 }, { 0, 0, 3, 0, 0, 0, 1, 0, 1, 0, 0, 0, 3, 0, 0 }, { 1, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 1 }, { 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0 },
+				{ 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0 }, { 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }, { 4, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 1, 0, 0, 4 }, { 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }, { 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0 },
+				{ 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0 }, { 1, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 1 }, { 0, 0, 3, 0, 0, 0, 1, 0, 1, 0, 0, 0, 3, 0, 0 }, { 0, 3, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0 }, { 4, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 4 }, };
 	}
 
 	public ScrabbleGame(ScrabbleGame g) {
