@@ -59,6 +59,8 @@ public class GameClient extends Client {
 
 	private int scrabbleNextPlayer;
 
+	private HashMap<Integer, ArrayList<Character>> scrabblePlayerHands;
+
 	public GameClient() {
 		super();
 
@@ -72,6 +74,7 @@ public class GameClient extends Client {
 		this.scrabbleIncomingMove = new ArrayList<>();
 		this.scrabbleOutgoingMove = new ArrayList<>();
 		this.scrabblePlayerScores = new HashMap<>();
+		this.scrabblePlayerHands = new HashMap<>();
 	}
 
 	//i don't like this, this is dumb
@@ -240,6 +243,7 @@ public class GameClient extends Client {
 		case "scrabble_start_game": {
 			this.scrabbleGame = new ScrabbleGame();
 			this.scrabblePlayerScores.clear();
+			this.scrabblePlayerHands.clear();
 			this.scrabbleIsGameStarting = true;
 			break;
 		}
@@ -250,6 +254,7 @@ public class GameClient extends Client {
 		}
 
 		case "scrabble_next_player": {
+			System.out.println("NEXT PLAYER PACK");
 			this.scrabbleNextPlayer = packetListener.readInt();
 			break;
 		}
@@ -269,6 +274,18 @@ public class GameClient extends Client {
 				int playerID = packetListener.readInt();
 				int score = packetListener.readInt();
 				this.scrabblePlayerScores.put(playerID, score);
+			}
+			break;
+		}
+
+		case "scrabble_player_hand": {
+			for (int i = 0; i < elementAmt; i++) {
+				int playerID = packetListener.readInt();
+				ArrayList<Character> hand = new ArrayList<>();
+				for (int j = 0; j < ScrabbleGame.handSize; j++) {
+					hand.add((char) packetListener.readInt());
+				}
+				this.scrabblePlayerHands.put(playerID, hand);
 			}
 			break;
 		}
@@ -358,6 +375,24 @@ public class GameClient extends Client {
 		this.scrabbleIncomingMove.clear();
 		this.scrabbleOutgoingMove.clear();
 		this.scrabbleIsGameStarting = false;
+		this.scrabblePlayerHands.clear();
+		this.scrabblePlayerScores.clear();
+	}
+
+	public ArrayList<Character> scrabbleGetPlayerHand(int id) {
+		return this.scrabblePlayerHands.get(id);
+	}
+
+	public ScrabbleGame scrabbleGetGame() {
+		return this.scrabbleGame;
+	}
+
+	public int scrabbleGetNextPlayer() {
+		return this.scrabbleNextPlayer;
+	}
+
+	public HashMap<Integer, Integer> scrabbleGetPlayerScores() {
+		return this.scrabblePlayerScores;
 	}
 
 	public boolean scrabbleIsGameStarting() {

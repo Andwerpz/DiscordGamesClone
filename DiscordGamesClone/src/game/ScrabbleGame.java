@@ -6,6 +6,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -80,6 +81,10 @@ public class ScrabbleGame {
 			ScrabbleGame.loadWordList();
 		}
 
+		for (char[] i : this.letterBoard) {
+			Arrays.fill(i, LETTER_EMPTY);
+		}
+
 		//generate bonus board
 		this.bonusBoard = new int[][] { { 4, 0, 0, 1, 0, 0, 0, 4, 0, 0, 0, 1, 0, 0, 4 }, { 0, 3, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 3, 0 }, { 0, 0, 3, 0, 0, 0, 1, 0, 1, 0, 0, 0, 3, 0, 0 }, { 1, 0, 0, 3, 0, 0, 0, 1, 0, 0, 0, 3, 0, 0, 1 }, { 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0 },
 				{ 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0 }, { 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }, { 4, 0, 0, 1, 0, 0, 0, 5, 0, 0, 0, 1, 0, 0, 4 }, { 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0 }, { 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0, 0, 0, 2, 0 },
@@ -92,6 +97,10 @@ public class ScrabbleGame {
 
 		if (ScrabbleGame.wordList == null) {
 			ScrabbleGame.loadWordList();
+		}
+
+		for (char[] i : this.letterBoard) {
+			Arrays.fill(i, LETTER_EMPTY);
 		}
 
 		for (int i = 0; i < boardSize; i++) {
@@ -142,25 +151,29 @@ public class ScrabbleGame {
 	public int makeMove(ArrayList<Pair<int[], Character>> tiles) {
 		// - you must place down at least 2 tiles
 		if (tiles.size() <= 1) {
+			System.err.println("MUST PLACE AT LEAST 2 TILES");
 			return -1;
 		}
 
 		// - all tiles have to be in the same row or column
-		int[] tl = tiles.get(0).first;
-		int[] br = tiles.get(0).first;
+		int[] tl = new int[] { tiles.get(0).first[0], tiles.get(0).first[1] };
+		int[] br = new int[] { tiles.get(0).first[0], tiles.get(0).first[1] };
 		for (Pair<int[], Character> i : tiles) {
-			int[] t = i.first;
-			tl[0] = Math.min(tl[0], t[0]);
-			tl[1] = Math.min(tl[1], t[1]);
-			br[0] = Math.max(br[0], t[0]);
-			br[1] = Math.max(br[1], t[1]);
+			int r = i.first[0];
+			int c = i.first[1];
+			tl[0] = Math.min(tl[0], r);
+			tl[1] = Math.min(tl[1], c);
+			br[0] = Math.max(br[0], r);
+			br[1] = Math.max(br[1], c);
 		}
 		if (br[0] - tl[0] != 0 && br[1] - tl[1] != 0) {
+			System.err.println("NOT IN SAME ROW OR COL");
 			return -1;
 		}
 
 		// - all tiles must be on the board
 		if (tl[0] < 0 || tl[1] < 0 || br[0] >= boardSize || br[1] >= boardSize) {
+			System.err.println("ALL TILES MUST BE ON BOARD");
 			return -1;
 		}
 
@@ -176,6 +189,7 @@ public class ScrabbleGame {
 			int r = i.first[0];
 			int c = i.first[1];
 			if (nextBoard[r][c] != LETTER_EMPTY) {
+				System.err.println("NEW TILES MUST NOT REPLACE OLD TILES");
 				return -1;
 			}
 			nextBoard[r][c] = i.second;
@@ -186,6 +200,7 @@ public class ScrabbleGame {
 		for (int i = tl[0]; i <= br[0]; i++) {
 			for (int j = tl[1]; j <= br[1]; j++) {
 				if (nextBoard[i][j] == LETTER_EMPTY) {
+					System.err.println("THERE MUST BE NO GAPS BETWEEN FIRST AND LAST TILE");
 					return -1;
 				}
 			}
@@ -193,6 +208,7 @@ public class ScrabbleGame {
 
 		// - all of the new words have to be valid
 		if (!isLetterBoardValid(nextBoard)) {
+			System.err.println("ALL WORDS MUST BE VALID");
 			return -1;
 		}
 
@@ -202,14 +218,17 @@ public class ScrabbleGame {
 		for (int i = 0; i < boardSize; i++) {
 			int rowWordScore = 0;
 			int rowWordMultiplier = 1;
+			int rowWordLength = 0;
 			boolean rowWordNew = false;
 
 			int colWordScore = 0;
 			int colWordMultiplier = 1;
+			int colWordLength = 0;
 			boolean colWordNew = false;
 			for (int j = 0; j < boardSize; j++) {
 				if (this.letterBoard[i][j] != LETTER_EMPTY) {
 					int lScore = ScrabbleGame.letterScore.get(this.letterBoard[i][j]);
+					rowWordLength++;
 					if (this.bonusBoard[i][j] == BONUS_LETTER_DOUBLE) {
 						lScore *= 2;
 					}
@@ -231,6 +250,7 @@ public class ScrabbleGame {
 				}
 				if (this.letterBoard[j][i] != LETTER_EMPTY) {
 					int lScore = ScrabbleGame.letterScore.get(this.letterBoard[j][i]);
+					colWordLength++;
 					if (this.bonusBoard[j][i] == BONUS_LETTER_DOUBLE) {
 						lScore *= 2;
 					}
@@ -253,7 +273,7 @@ public class ScrabbleGame {
 
 				// - add score to counter
 				if (this.letterBoard[i][j] == LETTER_EMPTY || j == boardSize - 1) {
-					if (rowWordNew) {
+					if (rowWordNew && rowWordLength >= 2) {
 						score += rowWordScore * rowWordMultiplier;
 					}
 					rowWordScore = 0;
@@ -261,7 +281,7 @@ public class ScrabbleGame {
 					rowWordNew = false;
 				}
 				if (this.letterBoard[j][i] == LETTER_EMPTY || j == boardSize - 1) {
-					if (colWordNew) {
+					if (colWordNew && colWordLength >= 2) {
 						score += colWordScore * colWordMultiplier;
 					}
 					colWordScore = 0;
@@ -270,6 +290,8 @@ public class ScrabbleGame {
 				}
 			}
 		}
+
+		System.err.println("THIS IS A VALID MOVE OF SCORE : " + score);
 
 		return score;
 	}
@@ -284,25 +306,28 @@ public class ScrabbleGame {
 			String rowWord = "";
 			String colWord = "";
 			for (int j = 0; j < boardSize; j++) {
-				if (this.letterBoard[i][j] != LETTER_EMPTY) {
-					rowWord += this.letterBoard[i][j];
+				if (board[i][j] != LETTER_EMPTY) {
+					rowWord += board[i][j];
 				}
-				if (this.letterBoard[j][i] != LETTER_EMPTY) {
-					colWord += this.letterBoard[i][j];
+				if (board[j][i] != LETTER_EMPTY) {
+					colWord += board[j][i];
 				}
 
 				// - check against dictionary
-				if (this.letterBoard[i][j] == LETTER_EMPTY || j == boardSize - 1) {
-					if (!ScrabbleGame.wordList.contains(rowWord)) {
+				if (rowWord.length() != 0 && (board[i][j] == LETTER_EMPTY || j == boardSize - 1)) {
+					if (rowWord.length() >= 2 && !ScrabbleGame.wordList.contains(rowWord)) {
 						return false;
 					}
+					rowWord = "";
 				}
-				if (this.letterBoard[j][i] == LETTER_EMPTY || j == boardSize - 1) {
-					if (!ScrabbleGame.wordList.contains(colWord)) {
+				if (colWord.length() != 0 && (board[j][i] == LETTER_EMPTY || j == boardSize - 1)) {
+					if (colWord.length() >= 2 && !ScrabbleGame.wordList.contains(colWord)) {
 						return false;
 					}
+					colWord = "";
 				}
 			}
+			System.out.println();
 		}
 		return true;
 	}

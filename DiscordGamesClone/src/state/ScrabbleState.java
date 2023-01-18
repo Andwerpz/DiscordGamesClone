@@ -36,6 +36,7 @@ import ui.UIElement;
 import ui.UIFilledRectangle;
 import util.FontUtils;
 import util.Mat4;
+import util.Pair;
 import util.Vec2;
 import util.Vec3;
 import util.Vec4;
@@ -63,6 +64,9 @@ public class ScrabbleState extends State {
 	private static final int HAND_TILE_SCENE = 11;
 	private static final int HAND_TILE_TEXT_SCENE = 12;
 
+	private static final int HUD_SCENE = 13;
+	private static final int HUD_TEXT_SCENE = 14;
+
 	private Material backgroundColor = new Material(new Vec3(247, 213, 173).mul(1.0f / 255.0f));
 	private Material boardBackgroundColor = new Material(new Vec3(255, 247, 227).mul(1.0f / 255.0f));
 
@@ -75,6 +79,11 @@ public class ScrabbleState extends State {
 	private Material startCellColor = new Material(new Vec3(90, 70, 90).mul(1.0f / 255.0f));
 
 	private Material tileColor = new Material(new Vec3(255, 135, 92).mul(1.0f / 255.0f));
+
+	private Material lightGray = new Material(new Vec3(66, 69, 73).mul(1.0f / 255.0f));
+	private Material lightBlue = new Material(new Vec3(114, 137, 218).mul(1.0f / 255.0f));
+	private Material gray = new Material(new Vec3(54, 57, 62).mul(1.0f / 255.0f));
+	private Material darkGray = new Material(new Vec3(40, 43, 48).mul(1.0f / 255.0f));
 
 	private TextureMaterial tileTexture;
 
@@ -143,6 +152,8 @@ public class ScrabbleState extends State {
 	private long tileHeldRectID;
 	private long tileHeldOriginalCellID;
 
+	private int uiElementGap = 20;
+
 	public ScrabbleState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm);
 
@@ -175,7 +186,9 @@ public class ScrabbleState extends State {
 
 		this.tileTexture = new TextureMaterial(new Texture("/scrabble/scrabble_tile.png", Texture.VERTICAL_FLIP_BIT));
 
-		this.drawMainMenu();
+		this.drawUI();
+
+		// -- ONLY DO THIS ONCE D: --
 		this.drawScrabbleGame();
 		this.drawHand();
 
@@ -201,35 +214,113 @@ public class ScrabbleState extends State {
 		this.boardScreen.kill();
 	}
 
-	private void drawMainMenu() {
-		// -- BACKGROUND --
+	private void drawUI() {
+		//don't clear the scenes related to board rendering
+		//it is problematic
 		this.clearScene(BACKGROUND_SCENE);
+		this.clearScene(INPUT_SCENE);
+		this.clearScene(HUD_SCENE);
+		this.clearScene(HUD_TEXT_SCENE);
+
+		// -- BACKGROUND --
 		UIFilledRectangle backgroundRect = new UIFilledRectangle(0, 0, -1, Main.windowWidth, Main.windowHeight, BACKGROUND_SCENE);
 		backgroundRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		backgroundRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 		backgroundRect.setMaterial(this.backgroundColor);
 
-		this.clearScene(INPUT_SCENE);
-		if (this.client.isHost()) {
-			Button startGameBtn = new Button(20, 20, 200, 80, "btn_start_game", "Start Game", FontUtils.ggsans.deriveFont(Font.BOLD), 36, INPUT_SCENE);
+		if (this.client.isHost() && !this.isInGame) {
+			Button startGameBtn = new Button(20, 20, 200, this.cellSizePx + this.cellGapPx * 2, "btn_start_game", " ", FontUtils.ggsans.deriveFont(Font.BOLD), 36, INPUT_SCENE);
 			startGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 			startGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 		}
 
+		if (this.isInGame) {
+			this.drawGameHUD();
+		}
+
+		UIElement.alignAllUIElements();
+	}
+
+	private void drawGameHUD() {
+		// -- SCORE DISPLAY --
+		HashMap<Integer, Integer> playerScores = this.client.scrabbleGetPlayerScores();
+		HashMap<Integer, String> players = this.client.getPlayers();
+
+		int playerRectWidth = 200;
+		int playerRectHeight = 50;
+		int playerRectGap = 5;
+		int scoreboardWidth = playerRectWidth + playerRectGap * 2;
+		int scoreboardHeight = playerRectHeight * players.size() + playerRectGap * (players.size() + 1);
+
+		UIFilledRectangle scoreboardBackground = new UIFilledRectangle(this.uiElementGap, 0, 0, scoreboardWidth, scoreboardHeight, HUD_SCENE);
+		scoreboardBackground.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_CENTER_BOTTOM);
+		scoreboardBackground.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_CENTER);
+		scoreboardBackground.setMaterial(this.gray);
+
+		int yOffset = playerRectGap;
+		int xOffset = playerRectGap;
+		for (int id : playerScores.keySet()) {
+			int score = playerScores.get(id);
+			String nick = players.get(id);
+
+			UIFilledRectangle playerRect = new UIFilledRectangle(xOffset, yOffset, 0, playerRectWidth, playerRectHeight, HUD_SCENE);
+			playerRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+			playerRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
+			playerRect.setMaterial(this.lightGray);
+			playerRect.bind(scoreboardBackground);
+
+			Text nickText = new Text(playerRectGap, playerRectGap, nick, FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, HUD_TEXT_SCENE);
+			nickText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+			nickText.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
+			nickText.bind(playerRect);
+
+			Text scoreText = new Text(playerRectGap, playerRectGap, score + "", FontUtils.ggsans, 16, Color.WHITE, HUD_TEXT_SCENE);
+			scoreText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+			scoreText.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+			scoreText.bind(playerRect);
+
+			yOffset += playerRectHeight + playerRectGap;
+		}
+
+		// -- MOVE INDICATOR --
+
+		int rectWidth = 500;
+		int rectHeight = 50;
+
+		UIFilledRectangle moveIndicatorRect = new UIFilledRectangle(0, 0, 0, rectWidth, rectHeight, HUD_SCENE);
+		moveIndicatorRect.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_TOP);
+		moveIndicatorRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
+		moveIndicatorRect.setMaterial(this.gray);
+
+		int nextPlayer = this.client.scrabbleGetNextPlayer();
+		String indicatorString = players.get(nextPlayer) + "'s Move";
+		if (nextPlayer == this.client.getID()) {
+			indicatorString = "Your Move";
+		}
+
+		Text moveIndicatorText = new Text(0, 0, indicatorString, FontUtils.ggsans.deriveFont(Font.BOLD), 32, Color.WHITE, HUD_TEXT_SCENE);
+		moveIndicatorText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		moveIndicatorText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		moveIndicatorText.bind(moveIndicatorRect);
+
+		UIFilledRectangle makeMoveBackground = new UIFilledRectangle(0, rectHeight, 0, rectWidth, rectHeight, HUD_SCENE);
+		makeMoveBackground.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_TOP);
+		makeMoveBackground.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
+
+		if (this.isCurMoveValid() && nextPlayer == this.client.getID()) {
+			makeMoveBackground.setMaterial(this.tileColor);
+		}
+		else {
+			makeMoveBackground.setMaterial(this.darkGray);
+		}
+
+		Button makeMoveBtn = new Button(0, 0, rectWidth, rectHeight, "btn_make_move", "Play Move", FontUtils.ggsans.deriveFont(Font.BOLD), 20, INPUT_SCENE);
+		makeMoveBtn.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		makeMoveBtn.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		makeMoveBtn.bind(makeMoveBackground);
 	}
 
 	private void drawScrabbleGame() {
-		this.clearScene(BOARD_SCENE);
-
-		this.clearScene(CELL_SCENE);
-		this.clearScene(CELL_TEXT_SCENE);
-
-		this.clearScene(TILE_SCENE);
-		this.clearScene(TILE_TEXT_SCENE);
-
-		this.clearScene(HAND_CELL_SCENE);
-		this.clearScene(HAND_TILE_SCENE);
-
 		this.scrabbleBoardBackground = new UIFilledRectangle(0, 0, -1, this.boardBackgroundSizePx, this.boardBackgroundSizePx, BOARD_SCENE);
 		this.scrabbleBoardBackground.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 		this.scrabbleBoardBackground.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
@@ -312,17 +403,12 @@ public class ScrabbleState extends State {
 	}
 
 	private void drawHand() {
-		this.clearScene(HAND_BACKGROUND_SCENE);
-		this.clearScene(HAND_CELL_SCENE);
-		this.clearScene(HAND_TILE_SCENE);
-		this.clearScene(HAND_TILE_TEXT_SCENE);
-
 		int handBackgroundWidth = ScrabbleGame.handSize * this.cellSizePx + (ScrabbleGame.handSize + 1) * this.cellGapPx;
 		int handBackgroundHeight = this.cellSizePx + this.cellGapPx * 2;
 
 		Material handMaterial = new Material(new Vec4(0, 0, 0, 0.3f));
 
-		UIFilledRectangle backgroundRect = new UIFilledRectangle(0, 20, 1, handBackgroundWidth, handBackgroundHeight, HAND_CELL_SCENE);
+		UIFilledRectangle backgroundRect = new UIFilledRectangle(0, this.uiElementGap, 1, handBackgroundWidth, handBackgroundHeight, HAND_CELL_SCENE);
 		backgroundRect.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_BOTTOM);
 		backgroundRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_BOTTOM);
 		backgroundRect.setMaterial(handMaterial);
@@ -341,7 +427,6 @@ public class ScrabbleState extends State {
 			this.cellCoords.put(cellID, new int[] { -1, i });
 			this.cellScenes.put(cellID, new int[] { HAND_TILE_SCENE, HAND_TILE_TEXT_SCENE });
 		}
-
 	}
 
 	private void removeAllMoveableTiles() {
@@ -495,6 +580,23 @@ public class ScrabbleState extends State {
 		this.removeTile(this.tileHeldRectID);
 	}
 
+	private ArrayList<Pair<int[], Character>> getCurMove() {
+		ArrayList<Pair<int[], Character>> ans = new ArrayList<>();
+		for (long tileID : this.tileRects.keySet()) {
+			long cellID = this.tileRects.get(tileID).getParent().getID();
+			int[] coords = this.cellCoords.get(cellID);
+			if (coords[0] != -1 && this.tileIsMoveable.get(tileID)) {
+				ans.add(new Pair<int[], Character>(new int[] { coords[0], coords[1] }, this.tileLetters.get(tileID)));
+			}
+		}
+		return ans;
+	}
+
+	private boolean isCurMoveValid() {
+		ScrabbleGame game = this.client.scrabbleGetGame();
+		return game.isMoveValid(this.getCurMove());
+	}
+
 	@Override
 	public void update() {
 		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
@@ -506,10 +608,39 @@ public class ScrabbleState extends State {
 
 		if (this.client.scrabbleIsGameStarting()) {
 			this.removeAllMoveableTiles();
+			this.isInGame = true;
+
+			//retrieve player's hand
+			ArrayList<Character> hand = this.client.scrabbleGetPlayerHand(this.client.getID());
+			for (int i = 0; i < hand.size(); i++) {
+				this.placeTileOnCell(-1, i, hand.get(i), true);
+			}
+
+			this.drawUI();
 		}
 
 		if (this.client.scrabbleIsGameEnding()) {
 			this.makeAllTilesMoveable();
+			this.isInGame = false;
+			this.drawUI();
+		}
+
+		if (this.isInGame) {
+			ArrayList<Pair<int[], Character>> nextMove = this.client.scrabbleGetIncomingMove();
+			if (nextMove.size() != 0) {
+				this.removeAllMoveableTiles();
+				for (Pair<int[], Character> i : nextMove) {
+					this.placeTileOnCell(i.first[0], i.first[1], i.second, false);
+				}
+
+				//retrieve player's hand
+				ArrayList<Character> hand = this.client.scrabbleGetPlayerHand(this.client.getID());
+				for (int i = 0; i < hand.size(); i++) {
+					this.placeTileOnCell(-1, i, hand.get(i), true);
+				}
+
+				this.drawUI();
+			}
 		}
 
 		// -- OTHER STUFF --
@@ -603,6 +734,11 @@ public class ScrabbleState extends State {
 		uiScreen.setUIScene(HELD_TILE_TEXT_SCENE);
 		uiScreen.render(outputBuffer);
 
+		uiScreen.setUIScene(HUD_SCENE);
+		uiScreen.render(outputBuffer);
+		uiScreen.setUIScene(HUD_TEXT_SCENE);
+		uiScreen.render(outputBuffer);
+
 		uiScreen.setUIScene(INPUT_SCENE);
 		uiScreen.render(outputBuffer);
 	}
@@ -626,13 +762,26 @@ public class ScrabbleState extends State {
 		String clickedButton = Input.getClicked();
 		switch (clickedButton) {
 		case "btn_start_game": {
+			if (this.isInGame) {
+				break;
+			}
 			this.client.scrabbleStartGame();
+			break;
+		}
+
+		case "btn_make_move": {
+			if (!this.isCurMoveValid() || this.client.getID() != this.client.scrabbleGetNextPlayer()) {
+				break;
+			}
+			this.client.scrabbleMakeMove(this.getCurMove());
 			break;
 		}
 		}
 
 		if (this.tileHeld) {
 			this.releaseTile();
+
+			this.drawUI();
 		}
 
 		this.draggingBoard = false;
