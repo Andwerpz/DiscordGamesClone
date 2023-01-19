@@ -719,12 +719,6 @@ public class ScrabbleState extends State {
 			this.drawUI();
 		}
 
-		if (this.client.scrabbleIsGameEnding()) {
-			this.makeAllTilesMoveable();
-			this.isInGame = false;
-			this.drawUI();
-		}
-
 		if (this.isInGame) {
 			ArrayList<Pair<int[], Character>> nextMove = this.client.scrabbleGetIncomingMove();
 			if (nextMove.size() != 0) {
@@ -747,6 +741,12 @@ public class ScrabbleState extends State {
 
 				this.drawUI();
 			}
+		}
+
+		if (this.client.scrabbleIsGameEnding()) {
+			this.makeAllTilesMoveable();
+			this.isInGame = false;
+			this.drawUI();
 		}
 
 		// -- OTHER STUFF --

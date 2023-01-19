@@ -178,10 +178,6 @@ public class GameServer extends Server {
 			this.scrabbleMoveIndex = 0;
 		}
 
-		if (this.scrabbleEndingGame) {
-			packetSender.writeSectionHeader("scrabble_end_game", 1);
-		}
-
 		if (this.scrabbleMovePerformed || this.scrabbleStartingGame) {
 			packetSender.writeSectionHeader("scrabble_next_player", 1);
 			packetSender.write(this.scrabbleRoundsLeft);
@@ -212,6 +208,10 @@ public class GameServer extends Server {
 				packetSender.write(id);
 				packetSender.write(this.scrabblePlayerScores.get(id));
 			}
+		}
+
+		if (this.scrabbleEndingGame) {
+			packetSender.writeSectionHeader("scrabble_end_game", 1);
 		}
 	}
 
