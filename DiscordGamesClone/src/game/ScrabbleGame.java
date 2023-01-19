@@ -205,12 +205,15 @@ public class ScrabbleGame {
 		return true;
 	}
 
+	private int[] dr = new int[] { -1, 1, 0, 0 };
+	private int[] dc = new int[] { 0, 0, -1, 1 };
+
 	//if the move is invalid, then returns -1
 	//else, returns the score of the move, and applies the move to the board
 	public int makeMove(ArrayList<Pair<int[], Character>> tiles) {
 		// - you must place down at least 2 tiles
 		if (tiles.size() <= 1) {
-			System.err.println("MUST PLACE AT LEAST 2 TILES");
+			//System.err.println("MUST PLACE AT LEAST 2 TILES");
 			return -1;
 		}
 
@@ -219,6 +222,7 @@ public class ScrabbleGame {
 		int[] br = new int[] { tiles.get(0).first[0], tiles.get(0).first[1] };
 
 		boolean overStartTile = false;
+		boolean adjToOldTile = false;
 		for (Pair<int[], Character> i : tiles) {
 			int r = i.first[0];
 			int c = i.first[1];
@@ -230,9 +234,22 @@ public class ScrabbleGame {
 			if (this.bonusBoard[r][c] == BONUS_START) {
 				overStartTile = true;
 			}
+
+			if (!adjToOldTile) {
+				for (int j = 0; j < 4; j++) {
+					int nr = r + dr[j];
+					int nc = c + dc[j];
+					if (nr < 0 || nc < 0 || nr >= boardSize || nc >= boardSize) {
+						continue;
+					}
+					if (this.letterBoard[nr][nc] != LETTER_EMPTY) {
+						adjToOldTile = true;
+					}
+				}
+			}
 		}
 		if (br[0] - tl[0] != 0 && br[1] - tl[1] != 0) {
-			System.err.println("NOT IN SAME ROW OR COL");
+			//System.err.println("NOT IN SAME ROW OR COL");
 			return -1;
 		}
 
@@ -241,9 +258,14 @@ public class ScrabbleGame {
 			return -1;
 		}
 
+		// - if it's not the first move, then at least one tile must be adjacent to a previously placed tile
+		if (!this.isFirstMove() && !adjToOldTile) {
+			return -1;
+		}
+
 		// - all tiles must be on the board
 		if (tl[0] < 0 || tl[1] < 0 || br[0] >= boardSize || br[1] >= boardSize) {
-			System.err.println("ALL TILES MUST BE ON BOARD");
+			//System.err.println("ALL TILES MUST BE ON BOARD");
 			return -1;
 		}
 
@@ -259,7 +281,7 @@ public class ScrabbleGame {
 			int r = i.first[0];
 			int c = i.first[1];
 			if (nextBoard[r][c] != LETTER_EMPTY) {
-				System.err.println("NEW TILES MUST NOT REPLACE OLD TILES");
+				//System.err.println("NEW TILES MUST NOT REPLACE OLD TILES");
 				return -1;
 			}
 			nextBoard[r][c] = i.second;
@@ -270,7 +292,7 @@ public class ScrabbleGame {
 		for (int i = tl[0]; i <= br[0]; i++) {
 			for (int j = tl[1]; j <= br[1]; j++) {
 				if (nextBoard[i][j] == LETTER_EMPTY) {
-					System.err.println("THERE MUST BE NO GAPS BETWEEN FIRST AND LAST TILE");
+					//System.err.println("THERE MUST BE NO GAPS BETWEEN FIRST AND LAST TILE");
 					return -1;
 				}
 			}
@@ -278,7 +300,7 @@ public class ScrabbleGame {
 
 		// - all of the new words have to be valid
 		if (!isLetterBoardValid(nextBoard)) {
-			System.err.println("ALL WORDS MUST BE VALID");
+			//System.err.println("ALL WORDS MUST BE VALID");
 			return -1;
 		}
 
@@ -399,6 +421,124 @@ public class ScrabbleGame {
 			}
 		}
 		return true;
+	}
+
+	private <T> ArrayList<ArrayList<T>> generatePermutations(ArrayList<T> a) {
+		ArrayList<ArrayList<T>> ans = new ArrayList<>();
+		this.generatePermutations(a, a.size(), a.size(), ans);
+		return ans;
+	}
+
+	private <T> void generatePermutations(ArrayList<T> a, int s, int n, ArrayList<ArrayList<T>> ans) {
+		if (s == 1) {
+			ArrayList<T> next = new ArrayList<>();
+			next.addAll(a);
+			ans.add(next);
+		}
+
+		for (int i = 0; i < s; i++) {
+			this.generatePermutations(a, s - 1, n, ans);
+			if (s % 2 == 1) {
+				T temp = a.get(0);
+				a.set(0, a.get(a.size() - 1));
+				a.set(a.size() - 1, temp);
+			}
+			else {
+				T temp = a.get(i);
+				a.set(i, a.get(a.size() - 1));
+				a.set(a.size() - 1, temp);
+			}
+		}
+	}
+
+	//returns the maximum scoring move, and returns null if no move exists. 
+	public ArrayList<Pair<int[], Character>> generateBestMove(ArrayList<Character> hand) {
+		int maxScore = 0;
+		ArrayList<Pair<int[], Character>> ans = null;
+
+		ArrayList<ArrayList<Character>> permutations = this.generatePermutations(hand);
+
+		//for each cell, try to make a word to the right
+		for (int i = 0; i < boardSize; i++) {
+			//find the cells that you can place stuff on
+			ArrayList<int[]> openCells = new ArrayList<>();
+			for (int j = 0; j < boardSize; j++) {
+				if (this.letterBoard[i][j] == LETTER_EMPTY) {
+					openCells.add(new int[] { i, j });
+				}
+			}
+
+			//generate the moves, and test them
+			for (int j = 0; j < openCells.size(); j++) {
+				//go through all move sizes
+				for (int k = 2; k <= hand.size() && j + k < openCells.size(); k++) {
+					int amtOfMoves = 1;
+					for (int l = hand.size(); l > hand.size() - k; l--) {
+						amtOfMoves *= l;
+					}
+
+					//go through each permutation
+					for (int l = 0; l < amtOfMoves; l++) {
+						ArrayList<Pair<int[], Character>> move = new ArrayList<>();
+						for (int r = 0; r < k; r++) {
+							int[] coord = openCells.get(r + j);
+							char c = permutations.get(l).get(r);
+							Pair<int[], Character> next = new Pair<>(coord, c);
+							move.add(next);
+						}
+
+						//test the move
+						int score = this.getMoveScore(move);
+						if (score > maxScore) {
+							ans = move;
+							maxScore = score;
+						}
+					}
+				}
+			}
+		}
+
+		//now do the same, but up to down
+		for (int i = 0; i < boardSize; i++) {
+			//find the cells that you can place stuff on
+			ArrayList<int[]> openCells = new ArrayList<>();
+			for (int j = 0; j < boardSize; j++) {
+				if (this.letterBoard[j][i] == LETTER_EMPTY) {
+					openCells.add(new int[] { j, i });
+				}
+			}
+
+			//generate the moves, and test them
+			for (int j = 0; j < openCells.size(); j++) {
+				//go through all move sizes
+				for (int k = 2; k <= hand.size() && j + k < openCells.size(); k++) {
+					int amtOfMoves = 1;
+					for (int l = hand.size(); l > hand.size() - k; l--) {
+						amtOfMoves *= l;
+					}
+
+					//go through each permutation
+					for (int l = 0; l < amtOfMoves; l++) {
+						ArrayList<Pair<int[], Character>> move = new ArrayList<>();
+						for (int r = 0; r < k; r++) {
+							int[] coord = openCells.get(r + j);
+							char c = permutations.get(l).get(r);
+							Pair<int[], Character> next = new Pair<>(coord, c);
+							move.add(next);
+						}
+
+						//test the move
+						int score = this.getMoveScore(move);
+						if (score > maxScore) {
+							ans = move;
+							maxScore = score;
+						}
+					}
+				}
+			}
+		}
+
+		return ans;
 	}
 
 }

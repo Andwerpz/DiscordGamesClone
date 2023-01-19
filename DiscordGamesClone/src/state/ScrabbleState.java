@@ -3,6 +3,8 @@ package state;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
 
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_C;
+
 import java.awt.Color;
 import java.awt.Font;
 import java.util.ArrayList;
@@ -910,7 +912,22 @@ public class ScrabbleState extends State {
 
 	@Override
 	public void keyPressed(int key) {
+		if (this.isInGame && key == GLFW_KEY_C && this.client.isHost()) {
+			ArrayList<Character> hand = new ArrayList<>();
+			for (long id : this.tileRects.keySet()) {
+				if (this.tileIsMoveable.get(id)) {
+					hand.add(this.tileLetters.get(id));
+				}
+			}
+			ArrayList<Pair<int[], Character>> bestMove = this.client.scrabbleGetGame().generateBestMove(hand);
 
+			if (bestMove == null) {
+				System.out.println("THERE IS NO MOVE");
+			}
+			else {
+				this.client.scrabbleMakeMove(bestMove);
+			}
+		}
 	}
 
 	@Override
