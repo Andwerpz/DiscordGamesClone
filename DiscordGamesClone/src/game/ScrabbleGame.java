@@ -70,6 +70,54 @@ public class ScrabbleGame {
 	//(8 points) - J, X
 	//(10 points) - Q, Z
 
+	public static HashMap<Character, Integer> letterDistribution = new HashMap<Character, Integer>() {
+		{
+			put('A', 9);
+			put('B', 2);
+			put('C', 2);
+			put('D', 4);
+			put('E', 12);
+			put('F', 2);
+			put('G', 3);
+			put('H', 2);
+			put('I', 9);
+			put('J', 1);
+			put('K', 1);
+			put('L', 4);
+			put('M', 2);
+			put('N', 6);
+			put('O', 8);
+			put('P', 2);
+			put('Q', 1);
+			put('R', 6);
+			put('S', 4);
+			put('T', 6);
+			put('U', 4);
+			put('V', 2);
+			put('W', 2);
+			put('X', 1);
+			put('Y', 2);
+			put('Z', 1);
+		}
+	};
+
+	public static char getRandomLetter() {
+		int charTotal = 0;
+		for (char c : ScrabbleGame.letterDistribution.keySet()) {
+			charTotal += ScrabbleGame.letterDistribution.get(c);
+		}
+		int rand = (int) (Math.random() * charTotal);
+		for (char c : ScrabbleGame.letterDistribution.keySet()) {
+			int val = ScrabbleGame.letterDistribution.get(c);
+			if (rand < val) {
+				return c;
+			}
+			rand -= val;
+		}
+		System.err.println("SOMETHING WENT WRONG SCRABBLE RANDOM LETTER GENERATION");
+		return '*';
+	}
+
 	private char[][] letterBoard;
 	private int[][] bonusBoard;
 
@@ -146,6 +194,17 @@ public class ScrabbleGame {
 		return this.bonusBoard;
 	}
 
+	private boolean isFirstMove() {
+		for (char[] i : this.letterBoard) {
+			for (char j : i) {
+				if (j != LETTER_EMPTY) {
+					return false;
+				}
+			}
+		}
+		return true;
+	}
+
 	//if the move is invalid, then returns -1
 	//else, returns the score of the move, and applies the move to the board
 	public int makeMove(ArrayList<Pair<int[], Character>> tiles) {
@@ -158,6 +217,8 @@ public class ScrabbleGame {
 		// - all tiles have to be in the same row or column
 		int[] tl = new int[] { tiles.get(0).first[0], tiles.get(0).first[1] };
 		int[] br = new int[] { tiles.get(0).first[0], tiles.get(0).first[1] };
+
+		boolean overStartTile = false;
 		for (Pair<int[], Character> i : tiles) {
 			int r = i.first[0];
 			int c = i.first[1];
@@ -165,9 +226,18 @@ public class ScrabbleGame {
 			tl[1] = Math.min(tl[1], c);
 			br[0] = Math.max(br[0], r);
 			br[1] = Math.max(br[1], c);
+
+			if (this.bonusBoard[r][c] == BONUS_START) {
+				overStartTile = true;
+			}
 		}
 		if (br[0] - tl[0] != 0 && br[1] - tl[1] != 0) {
 			System.err.println("NOT IN SAME ROW OR COL");
+			return -1;
+		}
+
+		// - if it's the first move, at least one of the tiles should be on the start tile
+		if (this.isFirstMove() && !overStartTile) {
 			return -1;
 		}
 
@@ -296,9 +366,9 @@ public class ScrabbleGame {
 		return score;
 	}
 
-	public boolean isMoveValid(ArrayList<Pair<int[], Character>> tiles) {
+	public int getMoveScore(ArrayList<Pair<int[], Character>> tiles) {
 		ScrabbleGame nextPos = new ScrabbleGame(this);
-		return nextPos.makeMove(tiles) != -1;
+		return nextPos.makeMove(tiles);
 	}
 
 	private boolean isLetterBoardValid(char[][] board) {
@@ -327,7 +397,6 @@ public class ScrabbleGame {
 					colWord = "";
 				}
 			}
-			System.out.println();
 		}
 		return true;
 	}

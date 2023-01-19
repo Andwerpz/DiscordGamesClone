@@ -52,7 +52,10 @@ public abstract class UIElement extends Entity {
 	protected float width, height;
 
 	//denotes the bottom left point of the bounding rectangle for this ui element
+	//we want this to be int as opposed to float to not get any weird interpixel sampling issues
+	//on ui elements that are constantly being resized tho, you might want them to remain as floats. 
 	protected float alignedX, alignedY;
+	private boolean clampAlignedCoordinatesToInt = true;
 
 	public UIElement(float xOffset, float yOffset, float z, float width, float height, int scene) {
 		this.horizontalAlignFrame = FROM_LEFT;
@@ -201,32 +204,42 @@ public abstract class UIElement extends Entity {
 	protected void alignContents() {
 		switch (this.horizontalAlignContent) {
 		case ALIGN_CENTER:
-			this.alignedX = this.x - this.width / 2;
+			this.alignedX = (this.x - this.width / 2);
 			break;
 
 		case ALIGN_RIGHT:
-			this.alignedX = this.x - this.width;
+			this.alignedX = (this.x - this.width);
 			break;
 
 		case ALIGN_LEFT:
-			this.alignedX = this.x;
+			this.alignedX = (this.x);
 			break;
 		}
 
 		switch (this.verticalAlignContent) {
 		case ALIGN_CENTER:
-			this.alignedY = this.y - this.height / 2;
+			this.alignedY = (this.y - this.height / 2);
 			break;
 
 		case ALIGN_TOP:
-			this.alignedY = this.y - this.height;
+			this.alignedY = (this.y - this.height);
 			break;
 
 		case ALIGN_BOTTOM:
-			this.alignedY = this.y;
+			this.alignedY = (this.y);
 			break;
 		}
+
+		if (this.clampAlignedCoordinatesToInt) {
+			this.alignedX = (int) alignedX;
+			this.alignedY = (int) alignedY;
+		}
+
 		this._alignContents();
+	}
+
+	public void setClampAlignedCoordinatesToInt(boolean b) {
+		this.clampAlignedCoordinatesToInt = b;
 	}
 
 	public float getLeftBorder() {
@@ -289,10 +302,10 @@ public abstract class UIElement extends Entity {
 
 	//binds this element to another element
 	public void bind(UIElement e) {
-		if(this.isBound()) {
+		if (this.isBound()) {
 			this.unbind();
 		}
-		
+
 		this.isBound = true;
 		this.parentElement = e;
 		e.boundElements.add(this);

@@ -68,6 +68,8 @@ public class GameServer extends Server {
 
 	private HashMap<Integer, ArrayList<Character>> scrabblePlayerHands;
 
+	private int scrabbleRoundsLeft = 0;
+
 	public GameServer(String ip, int port) {
 		super(ip, port);
 
@@ -169,8 +171,7 @@ public class GameServer extends Server {
 
 				ArrayList<Character> hand = new ArrayList<Character>();
 				for (int j = 0; j < ScrabbleGame.handSize; j++) {
-					char next = (char) ((int) (Math.random() * 26) + 'A');
-					hand.add(next);
+					hand.add(ScrabbleGame.getRandomLetter());
 				}
 				this.scrabblePlayerHands.put(i, hand);
 			}
@@ -183,6 +184,7 @@ public class GameServer extends Server {
 
 		if (this.scrabbleMovePerformed || this.scrabbleStartingGame) {
 			packetSender.writeSectionHeader("scrabble_next_player", 1);
+			packetSender.write(this.scrabbleRoundsLeft);
 			packetSender.write(this.scrabblePlayerMoveOrder.get(this.scrabbleMoveIndex));
 		}
 
@@ -329,6 +331,7 @@ public class GameServer extends Server {
 	public void readPacketScrabble(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
 		switch (sectionName) {
 		case "scrabble_start_game": {
+			this.scrabbleRoundsLeft = packetListener.readInt();
 			this.scrabbleStartingGame = true;
 			break;
 		}
@@ -355,9 +358,8 @@ public class GameServer extends Server {
 			//play the move and figure out the score
 			int score = this.scrabbleGame.makeMove(this.scrabbleNextMove);
 			if (score == -1) {
-				//the move is invalid
-				this.scrabbleNextMove.clear();
-				break;
+				//the move is invalid, or the player was just trying to swap out their tiles
+				score = 0;
 			}
 
 			//update, and move on to the next player
@@ -368,13 +370,19 @@ public class GameServer extends Server {
 			}
 
 			while (hand.size() != ScrabbleGame.handSize) {
-				char next = (char) ((int) (Math.random() * 26) + 'A');
-				hand.add(next);
+				hand.add(ScrabbleGame.getRandomLetter());
 			}
 
 			this.scrabblePlayerScores.put(clientID, this.scrabblePlayerScores.get(clientID) + score);
 			this.scrabbleMoveIndex = (this.scrabbleMoveIndex + 1) % this.scrabblePlayerMoveOrder.size();
 			this.scrabbleMovePerformed = true;
+
+			if (this.scrabbleMoveIndex == 0) {
+				this.scrabbleRoundsLeft--;
+			}
+			if (this.scrabbleRoundsLeft == 0) {
+				this.scrabbleEndingGame = true;
+			}
 			break;
 		}
 		}
@@ -456,6 +464,7 @@ public class GameServer extends Server {
 		this.scrabbleMovePerformed = false;
 		this.scrabbleStartingGame = false;
 		this.scrabblePlayerHands.clear();
+		this.scrabbleRoundsLeft = 0;
 	}
 
 	private void resetChessGameInfo() {
