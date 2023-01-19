@@ -164,6 +164,8 @@ public class ScrabbleState extends State {
 
 	private int numRounds = 5;
 
+	private HashMap<Integer, Integer> playerScores;
+
 	public ScrabbleState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm);
 
@@ -245,6 +247,8 @@ public class ScrabbleState extends State {
 			this.drawPregameMenu();
 		}
 
+		this.drawScoreDisplay();
+
 		UIElement.alignAllUIElements();
 	}
 
@@ -283,12 +287,24 @@ public class ScrabbleState extends State {
 			roundCounter.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_TOP);
 			roundCounter.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 			roundCounter.bind(textAlignmentRect);
+
+			UIFilledRectangle returnToLobbyBackgroundRect = new UIFilledRectangle(this.uiElementGap, this.uiElementGap, 0, rectWidth, this.cellSizePx + this.uiElementGap * 2, HUD_SCENE);
+			returnToLobbyBackgroundRect.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
+			returnToLobbyBackgroundRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
+			returnToLobbyBackgroundRect.setMaterial(this.lightGray);
+
+			Button returnToLobbyBtn = new Button(this.uiElementGap, this.uiElementGap, this.cellSizePx * 3, this.cellSizePx, "btn_return_to_lobby", "Return To Lobby", FontUtils.ggsans.deriveFont(Font.BOLD), 24, INPUT_SCENE);
+			returnToLobbyBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
+			returnToLobbyBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
+			returnToLobbyBtn.bind(returnToLobbyBackgroundRect);
 		}
 	}
 
-	private void drawGameHUD() {
+	private void drawScoreDisplay() {
 		// -- SCORE DISPLAY --
-		HashMap<Integer, Integer> playerScores = this.client.scrabbleGetPlayerScores();
+		if (this.playerScores == null) {
+			return;
+		}
 		HashMap<Integer, String> players = this.client.getPlayers();
 
 		int playerRectWidth = 250;
@@ -297,15 +313,15 @@ public class ScrabbleState extends State {
 		int scoreboardWidth = playerRectWidth + playerRectGap * 2;
 		int scoreboardHeight = playerRectHeight * players.size() + playerRectGap * (players.size() + 1);
 
-		UIFilledRectangle scoreboardBackground = new UIFilledRectangle(this.uiElementGap, 0, 0, scoreboardWidth, scoreboardHeight, HUD_SCENE);
-		scoreboardBackground.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_CENTER_BOTTOM);
-		scoreboardBackground.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_CENTER);
+		UIFilledRectangle scoreboardBackground = new UIFilledRectangle(this.uiElementGap, this.uiElementGap, 0, scoreboardWidth, scoreboardHeight, HUD_SCENE);
+		scoreboardBackground.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		scoreboardBackground.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 		scoreboardBackground.setMaterial(this.gray);
 
 		int yOffset = playerRectGap;
 		int xOffset = playerRectGap;
-		for (int id : playerScores.keySet()) {
-			int score = playerScores.get(id);
+		for (int id : this.playerScores.keySet()) {
+			int score = this.playerScores.get(id);
 			String nick = players.get(id);
 
 			UIFilledRectangle playerRect = new UIFilledRectangle(xOffset, yOffset, 0, playerRectWidth, playerRectHeight, HUD_SCENE);
@@ -326,7 +342,9 @@ public class ScrabbleState extends State {
 
 			yOffset += playerRectHeight + playerRectGap;
 		}
+	}
 
+	private void drawGameHUD() {
 		// -- MOVE INDICATOR --
 		int rectWidth = 500;
 		int rectHeight = 50;
@@ -337,7 +355,7 @@ public class ScrabbleState extends State {
 		moveIndicatorRect.setMaterial(this.gray);
 
 		int nextPlayer = this.client.scrabbleGetNextPlayer();
-		String indicatorString = players.get(nextPlayer) + "'s Move";
+		String indicatorString = this.client.getPlayers().get(nextPlayer) + "'s Move";
 		if (nextPlayer == this.client.getID()) {
 			indicatorString = "Your Move";
 		}
@@ -371,6 +389,17 @@ public class ScrabbleState extends State {
 		makeMoveBtn.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		makeMoveBtn.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 		makeMoveBtn.bind(makeMoveBackground);
+
+		// -- ROUND INDICATOR --
+		UIFilledRectangle roundIndicatorRect = new UIFilledRectangle(this.uiElementGap, this.uiElementGap, 0, 200, 60, HUD_SCENE);
+		roundIndicatorRect.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
+		roundIndicatorRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
+		roundIndicatorRect.setMaterial(this.lightGray);
+
+		Text roundIndicatorText = new Text(0, 0, this.client.scrabbleGetRoundsLeft() + " Rounds Left", FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, HUD_TEXT_SCENE);
+		roundIndicatorText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		roundIndicatorText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		roundIndicatorText.bind(roundIndicatorRect);
 	}
 
 	private void drawScrabbleGame() {
@@ -483,6 +512,8 @@ public class ScrabbleState extends State {
 	}
 
 	private void removeAllMoveableTiles() {
+		this.releaseTile();
+
 		ArrayList<Long> moveableTileIDs = new ArrayList<>();
 		for (long tileID : this.tileRects.keySet()) {
 			if (this.tileIsMoveable.get(tileID)) {
@@ -677,6 +708,12 @@ public class ScrabbleState extends State {
 				this.placeTileOnCell(-1, i, hand.get(i), true);
 			}
 
+			//reset player scores
+			this.playerScores = new HashMap<>();
+			for (int i : this.client.getPlayers().keySet()) {
+				this.playerScores.put(i, 0);
+			}
+
 			this.drawUI();
 		}
 
@@ -703,6 +740,9 @@ public class ScrabbleState extends State {
 						this.placeTileOnCell(i.first[0], i.first[1], i.second, false);
 					}
 				}
+
+				this.playerScores = this.client.scrabbleGetPlayerScores();
+
 				this.drawUI();
 			}
 		}
@@ -850,6 +890,11 @@ public class ScrabbleState extends State {
 		case "btn_decrement_rounds": {
 			this.numRounds--;
 			this.drawUI();
+			break;
+		}
+
+		case "btn_return_to_lobby": {
+			this.client.returnToMainLobby();
 			break;
 		}
 		}
