@@ -95,6 +95,10 @@ public class LobbyState extends State {
 	private float nickButtonMaxOffset = 10;
 	private float nickButtonOffset = nickButtonMaxOffset;
 
+	private float disconnectButtonHeight = 30;
+	private float disconnectButtonBaseOffset = -disconnectButtonHeight - 10;
+	private float disconnectButtonMaxOffset = nickButtonMaxOffset + nickButtonHeight + 10;
+
 	private ArrayList<UIFilledRectangle> transitionRects;
 	private ArrayList<Float> transitionVels;
 	private float transitionAccel = -1f;
@@ -112,6 +116,10 @@ public class LobbyState extends State {
 
 	private ArrayList<TextureMaterial> backgroundTextures;
 	private ArrayList<TextureMaterial> backgroundColorIDTextures;
+
+	private boolean failedToConnect = false;
+
+	private static String versionNumber = "v1.0.1";
 
 	public LobbyState(StateManager sm, String ip, int port, boolean hosting) {
 		super(sm);
@@ -156,10 +164,8 @@ public class LobbyState extends State {
 				this.startHosting();
 			}
 
-			for (int i = 0; i < 3; i++) {
-				if (this.connect()) {
-					break;
-				}
+			if (!this.connect()) {
+				this.failedToConnect = true;
 			}
 
 			this.client.setNickname(this.nickname);
@@ -177,7 +183,7 @@ public class LobbyState extends State {
 		this.menuMusic = new Sound("main_menu_music.ogg", true);
 		int menuMusicID = this.menuMusic.addSource();
 		Sound.setRelativePosition(menuMusicID, new Vec3(0));
-		Sound.setGain(menuMusicID, 0.3f);
+		Sound.setGain(menuMusicID, 0.05f);
 
 		this.transitionRects = new ArrayList<>();
 		this.transitionVels = new ArrayList<>();
@@ -203,6 +209,16 @@ public class LobbyState extends State {
 		this.client.exit();
 	}
 
+	private void killNetworking() {
+		this.disconnect();
+		this.stopHosting();
+	}
+
+	private void returnToMainMenu() {
+		this.killNetworking();
+		this.sm.switchState(new MainMenuState(this.sm));
+	}
+
 	@Override
 	public void kill() {
 		this.perspectiveScreen.kill();
@@ -225,7 +241,7 @@ public class LobbyState extends State {
 		this.backgroundTextures.add(new TextureMaterial(this.lobbyMainColorMap));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/chess_with_mr_beast.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/letter_league_v1.png", Texture.VERTICAL_FLIP_BIT)));
-		this.backgroundTextures.add(new TextureMaterial(new Texture("/darjeeling.png", Texture.VERTICAL_FLIP_BIT)));
+		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/blazing_eights.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/astolfo.png", Texture.VERTICAL_FLIP_BIT)));
 
 		// -- UI BACKGROUND --
@@ -274,6 +290,10 @@ public class LobbyState extends State {
 		leftSideButton.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		leftSideButton.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 
+		Button leaveLobbyBtn = new Button(0, this.disconnectButtonBaseOffset, 200, this.disconnectButtonHeight, "btn_disconnect", "Leave Lobby", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		leaveLobbyBtn.setFrameAlignmentStyle(UIElement.FROM_CENTER_RIGHT, UIElement.FROM_BOTTOM);
+		leaveLobbyBtn.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_BOTTOM);
+
 		UIElement.alignAllUIElements();
 	}
 
@@ -286,6 +306,10 @@ public class LobbyState extends State {
 		Text helloText = new Text(0, 90, "Hello, " + this.nickname + ".", FontUtils.ggsans, 24, Color.WHITE, LOBBY_MAIN_DYNAMIC);
 		helloText.setFrameAlignmentStyle(UIElement.FROM_CENTER_RIGHT, UIElement.FROM_TOP);
 		helloText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
+
+		Text versionText = new Text(20, 20, versionNumber, FontUtils.ggsans, 16, Color.WHITE, LOBBY_MAIN_DYNAMIC);
+		versionText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		versionText.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
 		int yOffset = 130;
 		int yIncrement = 30;
@@ -300,6 +324,10 @@ public class LobbyState extends State {
 
 	@Override
 	public void update() {
+		if (this.failedToConnect || !this.client.isConnected()) {
+			this.returnToMainMenu();
+		}
+
 		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
 
 		if (Input.getInput("btn_right_side") != null) {
@@ -362,6 +390,21 @@ public class LobbyState extends State {
 			TextField setNickTF = (TextField) Input.getInput("tf_set_nickname");
 			setNickTF.setFrameAlignmentOffset(5, (int) this.nickButtonOffset);
 			setNickTF.align();
+		}
+
+		if (Input.getInput("btn_disconnect") != null) {
+			Button setNickButton = (Button) Input.getInput("btn_disconnect");
+			float diff = 0;
+			float offset = setNickButton.getYOffset();
+			if (this.curBackgroundIndex == 0) {
+				diff = this.disconnectButtonMaxOffset - offset;
+			}
+			else {
+				diff = this.disconnectButtonBaseOffset - offset;
+			}
+			offset += diff * 0.1f;
+			setNickButton.setFrameAlignmentOffset(0, offset);
+			setNickButton.align();
 		}
 
 		for (int i = 0; i < this.transitionRects.size(); i++) {
@@ -518,6 +561,11 @@ public class LobbyState extends State {
 			if (this.hosting) {
 				this.stopHosting();
 			}
+			break;
+		}
+
+		case "btn_disconnect": {
+			this.returnToMainMenu();
 			break;
 		}
 

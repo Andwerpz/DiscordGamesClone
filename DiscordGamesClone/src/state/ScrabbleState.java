@@ -579,7 +579,7 @@ public class ScrabbleState extends State {
 		return tileRect;
 	}
 
-	private void placeTileOnCell(int row, int col, char tileLetter, boolean isMoveable) {
+	private UIFilledRectangle placeTileOnCell(int row, int col, char tileLetter, boolean isMoveable) {
 		long cellID = -1;
 		for (long id : this.cellRects.keySet()) {
 			int[] next = this.cellCoords.get(id);
@@ -588,18 +588,20 @@ public class ScrabbleState extends State {
 				break;
 			}
 		}
-		this.placeTileOnCell(cellID, tileLetter, isMoveable);
+		return this.placeTileOnCell(cellID, tileLetter, isMoveable);
 	}
 
-	private void placeTileOnCell(long cellID, char tileLetter, boolean isMoveable) {
+	private UIFilledRectangle placeTileOnCell(long cellID, char tileLetter, boolean isMoveable) {
 		if (!this.cellRects.containsKey(cellID) || this.cellTiles.containsKey(cellID)) {
-			return;
+			return null;
 		}
 
 		UIFilledRectangle tileRect = this.generateTile(tileLetter, isMoveable, cellID);
 		UIFilledRectangle cellRect = this.cellRects.get(cellID);
 		tileRect.bind(cellRect);
 		this.cellTiles.put(cellID, tileRect.getID());
+
+		return tileRect;
 	}
 
 	private void removeTile(long tileID) {
@@ -733,7 +735,17 @@ public class ScrabbleState extends State {
 				if (this.client.scrabbleIsIncomingMoveValid()) {
 					//place down move if valid
 					for (Pair<int[], Character> i : nextMove) {
-						this.placeTileOnCell(i.first[0], i.first[1], i.second, false);
+						UIFilledRectangle tileRect = this.placeTileOnCell(i.first[0], i.first[1], i.second, false);
+						int bonusID = this.client.scrabbleGetGame().getBonusBoard()[i.first[0]][i.first[1]];
+						switch (bonusID) {
+						case ScrabbleGame.BONUS_LETTER_DOUBLE:
+							tileRect.setMaterial(this.doubleLetterColor);
+							break;
+
+						case ScrabbleGame.BONUS_LETTER_TRIPLE:
+							tileRect.setMaterial(this.tripleLetterColor);
+							break;
+						}
 					}
 				}
 
@@ -912,7 +924,7 @@ public class ScrabbleState extends State {
 
 	@Override
 	public void keyPressed(int key) {
-		if (this.isInGame && key == GLFW_KEY_C && this.client.isHost()) {
+		if (this.isInGame && key == GLFW_KEY_C && this.client.scrabbleGetNextPlayer() == this.client.getID()) {
 			ArrayList<Character> hand = new ArrayList<>();
 			for (long id : this.tileRects.keySet()) {
 				if (this.tileIsMoveable.get(id)) {

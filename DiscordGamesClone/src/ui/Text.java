@@ -93,6 +93,10 @@ public class Text extends UIElement {
 
 	private void init(float width, float height, String text, Font font, Material textMaterial) {
 		this.text = text;
+		if (this.text.length() == 0) {
+			this.text = " ";
+		}
+
 		this.font = font;
 		this.fontSize = font.getSize();
 
