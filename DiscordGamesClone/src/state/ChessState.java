@@ -632,9 +632,6 @@ public class ChessState extends State {
 			}
 
 		}
-
-		Entity.updateEntities();
-		Model.updateModels();
 	}
 
 	@Override

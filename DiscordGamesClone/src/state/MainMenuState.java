@@ -55,6 +55,8 @@ public class MainMenuState extends State {
 	private float sideButtonOffset = sideButtonBaseOffset;
 	private int sideButtonWidth = (int) sideButtonMaxOffset;
 
+	private UIFilledRectangle logoRect;
+
 	public MainMenuState(StateManager sm) {
 		super(sm);
 
@@ -105,10 +107,10 @@ public class MainMenuState extends State {
 
 		// -- STATIC UI --
 		this.clearScene(STATIC_UI_SCENE);
-		UIFilledRectangle csgoLogo = new UIFilledRectangle(120, 50, 0, 560, 80, new FilledRectangle(), STATIC_UI_SCENE);
-		csgoLogo.setTextureMaterial(new TextureMaterial(new Texture("/discord_logo.png", Texture.VERTICAL_FLIP_BIT)));
-		csgoLogo.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_TOP);
-		csgoLogo.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		this.logoRect = new UIFilledRectangle(120, 50, 0, 560, 80, new FilledRectangle(), STATIC_UI_SCENE);
+		this.logoRect.setTextureMaterial(new TextureMaterial(new Texture("/discord_logo.png", Texture.VERTICAL_FLIP_BIT)));
+		this.logoRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_TOP);
+		this.logoRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
 		// -- DYNAMIC UI --
 		this.clearScene(DYNAMIC_UI_SCENE);
@@ -164,6 +166,8 @@ public class MainMenuState extends State {
 	public void update() {
 		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
 
+		this.logoRect.setRotationRads(this.logoRect.getRotationRads() + (float) Math.toRadians(1));
+
 		if (Input.getInput("btn_side") != null) {
 			Button sideButton = (Button) Input.getInput("btn_side");
 			float diff = 0;
@@ -177,9 +181,6 @@ public class MainMenuState extends State {
 			sideButton.setFrameAlignmentOffset((int) this.sideButtonOffset, 0);
 			sideButton.align();
 		}
-
-		Entity.updateEntities();
-		Model.updateModels();
 	}
 
 	@Override

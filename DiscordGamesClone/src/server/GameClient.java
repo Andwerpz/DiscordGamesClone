@@ -56,11 +56,14 @@ public class GameClient extends Client {
 	private ArrayList<Pair<int[], Character>> scrabbleIncomingMove;
 	private ArrayList<Pair<int[], Character>> scrabbleOutgoingMove;
 	private boolean scrabbleIsIncomingMoveValid = false;
+	private boolean scrabbleIsMoveIncoming = false;
 
 	private HashMap<Integer, Integer> scrabblePlayerScores;
 
 	private int scrabbleNextPlayer;
 	private int scrabbleRoundsLeft;
+
+	private boolean scrabbleSkipMove = false;
 
 	private HashMap<Integer, ArrayList<Character>> scrabblePlayerHands;
 
@@ -121,7 +124,15 @@ public class GameClient extends Client {
 		case GameServer.SCRABBLE:
 			this.writePacketScrabble(packetSender);
 			break;
+
+		case GameServer.BLAZING_EIGHTS:
+			this.writePacketBlazingEights(packetSender);
+			break;
 		}
+	}
+
+	private void writePacketBlazingEights(PacketSender packetSender) {
+
 	}
 
 	private void writePacketScrabble(PacketSender packetSender) {
@@ -139,6 +150,11 @@ public class GameClient extends Client {
 			packetSender.write(this.scrabbleStartGameRoundAmt);
 			this.scrabbleStartGameRoundAmt = 0;
 			this.scrabbleStartGame = false;
+		}
+
+		if (this.scrabbleSkipMove) {
+			packetSender.writeSectionHeader("scrabble_skip_move", 1);
+			this.scrabbleSkipMove = false;
 		}
 	}
 
@@ -239,8 +255,16 @@ public class GameClient extends Client {
 			case GameServer.SCRABBLE:
 				this.readPacketScrabble(packetListener, sectionName, elementAmt);
 				break;
+
+			case GameServer.BLAZING_EIGHTS:
+				this.readPacketBlazingEights(packetListener, sectionName, elementAmt);
+				break;
 			}
 		}
+	}
+
+	private void readPacketBlazingEights(PacketListener packetListener, String sectionName, int elementAmt) {
+
 	}
 
 	private void readPacketScrabble(PacketListener packetListener, String sectionName, int elementAmt) {
@@ -273,6 +297,7 @@ public class GameClient extends Client {
 				char letter = (char) packetListener.readInt();
 				this.scrabbleIncomingMove.add(new Pair<int[], Character>(coords, letter));
 			}
+			this.scrabbleIsMoveIncoming = true;
 			if (this.scrabbleGame.makeMove(this.scrabbleIncomingMove) != -1) {
 				this.scrabbleIsIncomingMoveValid = true;
 			}
@@ -389,8 +414,20 @@ public class GameClient extends Client {
 		this.scrabblePlayerScores.clear();
 	}
 
+	public void scrabbleSkipMove() {
+		this.scrabbleSkipMove = true;
+	}
+
 	public int scrabbleGetRoundsLeft() {
 		return this.scrabbleRoundsLeft;
+	}
+
+	public boolean scrabbleIsMoveIncoming() {
+		if (!this.scrabbleIsMoveIncoming) {
+			return false;
+		}
+		this.scrabbleIsMoveIncoming = false;
+		return true;
 	}
 
 	public boolean scrabbleIsIncomingMoveValid() {

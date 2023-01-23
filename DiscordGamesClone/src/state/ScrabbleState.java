@@ -402,6 +402,22 @@ public class ScrabbleState extends State {
 		roundIndicatorText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
 		roundIndicatorText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 		roundIndicatorText.bind(roundIndicatorRect);
+
+		// -- SKIP MOVE BTN --
+		if (this.client.isHost()) {
+			int skipRectWidth = 200;
+			int skipRectHeight = 60;
+
+			UIFilledRectangle skipMoveRect = new UIFilledRectangle(this.uiElementGap, this.uiElementGap, 0, skipRectWidth, skipRectHeight, HUD_SCENE);
+			skipMoveRect.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+			skipMoveRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+			skipMoveRect.setMaterial(this.lightGray);
+
+			Button skipMoveBtn = new Button(0, 0, skipRectWidth, skipRectHeight, "btn_skip_move", "Skip Move", FontUtils.ggsans.deriveFont(Font.BOLD), 24, INPUT_SCENE);
+			skipMoveBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+			skipMoveBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+			skipMoveBtn.bind(skipMoveRect);
+		}
 	}
 
 	private void drawScrabbleGame() {
@@ -722,8 +738,8 @@ public class ScrabbleState extends State {
 		}
 
 		if (this.isInGame) {
-			ArrayList<Pair<int[], Character>> nextMove = this.client.scrabbleGetIncomingMove();
-			if (nextMove.size() != 0) {
+			if (this.client.scrabbleIsMoveIncoming()) {
+				ArrayList<Pair<int[], Character>> nextMove = this.client.scrabbleGetIncomingMove();
 				this.removeAllMoveableTiles();
 
 				//retrieve player's hand
@@ -808,9 +824,6 @@ public class ScrabbleState extends State {
 				t.align();
 			}
 		}
-
-		Entity.updateEntities();
-		Model.updateModels();
 	}
 
 	@Override
@@ -909,6 +922,11 @@ public class ScrabbleState extends State {
 
 		case "btn_return_to_lobby": {
 			this.client.returnToMainLobby();
+			break;
+		}
+
+		case "btn_skip_move": {
+			this.client.scrabbleSkipMove();
 			break;
 		}
 		}

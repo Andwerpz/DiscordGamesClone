@@ -9,7 +9,6 @@ import game.ChessGame;
 import game.ScrabbleGame;
 import graphics.Material;
 import model.Model;
-import state.GameState;
 import util.Mat4;
 import util.MathUtils;
 import util.Pair;
@@ -36,6 +35,7 @@ public class GameServer extends Server {
 	public static final int LOBBY = 0;
 	public static final int CHESS = 1;
 	public static final int SCRABBLE = 2;
+	public static final int BLAZING_EIGHTS = 3;
 
 	private int curGame = LOBBY;
 
@@ -152,7 +152,15 @@ public class GameServer extends Server {
 		case SCRABBLE:
 			this.writePacketScrabble(packetSender, clientID);
 			break;
+
+		case BLAZING_EIGHTS:
+			this.writePacketBlazingEights(packetSender, clientID);
+			break;
 		}
+
+	}
+
+	private void writePacketBlazingEights(PacketSender packetSender, int clientID) {
 
 	}
 
@@ -324,8 +332,16 @@ public class GameServer extends Server {
 			case SCRABBLE:
 				this.readPacketScrabble(packetListener, clientID, sectionName, elementAmt);
 				break;
+
+			case BLAZING_EIGHTS:
+				this.readPacketBlazingEights(packetListener, clientID, sectionName, elementAmt);
+				break;
 			}
 		}
+	}
+
+	public void readPacketBlazingEights(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
+
 	}
 
 	public void readPacketScrabble(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
@@ -374,6 +390,21 @@ public class GameServer extends Server {
 			}
 
 			this.scrabblePlayerScores.put(clientID, this.scrabblePlayerScores.get(clientID) + score);
+			this.scrabbleMoveIndex = (this.scrabbleMoveIndex + 1) % this.scrabblePlayerMoveOrder.size();
+			this.scrabbleMovePerformed = true;
+
+			if (this.scrabbleMoveIndex == 0) {
+				this.scrabbleRoundsLeft--;
+			}
+			if (this.scrabbleRoundsLeft == 0) {
+				this.scrabbleEndingGame = true;
+			}
+			break;
+		}
+
+		case "scrabble_skip_move": {
+			//just move onto the next player
+			this.scrabbleNextMove.clear();
 			this.scrabbleMoveIndex = (this.scrabbleMoveIndex + 1) % this.scrabblePlayerMoveOrder.size();
 			this.scrabbleMovePerformed = true;
 

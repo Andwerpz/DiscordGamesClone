@@ -76,8 +76,10 @@ public class LobbyState extends State {
 
 	private long startTime;
 
-	private Vec3 lightGray = new Vec3(66, 69, 73).mul(1.0f / 255.0f);
-	private Vec3 lightBlue = new Vec3(114, 137, 218).mul(1.0f / 255.0f);
+	public static Material lightGray = new Material(new Vec3(66, 69, 73).mul(1.0f / 255.0f));
+	public static Material lightBlue = new Material(new Vec3(114, 137, 218).mul(1.0f / 255.0f));
+	public static Material gray = new Material(new Vec3(54, 57, 62).mul(1.0f / 255.0f));
+	public static Material darkGray = new Material(new Vec3(40, 43, 48).mul(1.0f / 255.0f));
 
 	private float sideButtonBaseOffset = 30;
 	private float sideButtonMaxOffset = 150;
@@ -257,7 +259,7 @@ public class LobbyState extends State {
 		UIFilledRectangle mainBackgroundRect = new UIFilledRectangle(0, 0, 0, Main.windowWidth, Main.windowHeight, new FilledRectangle(), LOBBY_MAIN_BACKGROUND);
 		mainBackgroundRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		mainBackgroundRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
-		mainBackgroundRect.setMaterial(new Material(this.lightGray));
+		mainBackgroundRect.setMaterial(lightGray);
 
 		// -- MAIN DYNAMIC --
 		this.drawLobbyMain();
@@ -458,11 +460,11 @@ public class LobbyState extends State {
 			case GameServer.SCRABBLE:
 				this.sm.switchState(new ScrabbleState(this.sm, this.client, this));
 				break;
+
+			case GameServer.BLAZING_EIGHTS:
+				this.sm.switchState(new BlazingEightsState(this.sm, this.client, this));
 			}
 		}
-
-		Entity.updateEntities();
-		Model.updateModels();
 	}
 
 	@Override
@@ -551,6 +553,10 @@ public class LobbyState extends State {
 
 			case 2:
 				this.client.startGame(GameServer.SCRABBLE);
+				break;
+
+			case 3:
+				this.client.startGame(GameServer.BLAZING_EIGHTS);
 				break;
 			}
 			break;
