@@ -7,6 +7,7 @@ import java.util.TreeMap;
 
 import game.ChessGame;
 import game.ScrabbleGame;
+import state.BlazingEightsState;
 import util.Pair;
 import util.Vec3;
 
@@ -67,6 +68,22 @@ public class GameClient extends Client {
 
 	private HashMap<Integer, ArrayList<Character>> scrabblePlayerHands;
 
+	// -- BLAZING EIGHTS --
+	private int blazingEightsMoveIndex;
+	private ArrayList<Integer> blazingEightsMoveOrder;
+
+	private HashMap<Integer, Integer> blazingEightsCardAmt;
+
+	private boolean blazingEightsStartGame = false; //flag to command server to start game
+	private boolean blazingEightsPerformMove = false;
+	private int blazingEightsPerformMoveType, blazingEightsPerformMoveValue;
+
+	private boolean blazingEightsStartingGame = false;
+	private boolean blazingEightsEndingGame = false;
+
+	private boolean blazingEightsMovePerformed = false;
+	private int blazingEightsMovePlayer, blazingEightsMoveValue, blazingEightsMoveType;
+
 	public GameClient() {
 		super();
 
@@ -81,12 +98,16 @@ public class GameClient extends Client {
 		this.scrabbleOutgoingMove = new ArrayList<>();
 		this.scrabblePlayerScores = new HashMap<>();
 		this.scrabblePlayerHands = new HashMap<>();
+
+		this.blazingEightsMoveOrder = new ArrayList<>();
+		this.blazingEightsCardAmt = new HashMap<>();
 	}
 
 	//i don't like this, this is dumb
 	public void resetAllGameInfo() {
 		this.resetChessGameInfo();
 		this.resetScrabbleGameInfo();
+		this.resetBlazingEightsGameInfo();
 	}
 
 	@Override
@@ -132,7 +153,17 @@ public class GameClient extends Client {
 	}
 
 	private void writePacketBlazingEights(PacketSender packetSender) {
+		if (this.blazingEightsStartGame) {
+			packetSender.writeSectionHeader("blazing_eights_start_game", 1);
+			this.blazingEightsStartGame = false;
+		}
 
+		if (this.blazingEightsPerformMove) {
+			packetSender.writeSectionHeader("blazing_eights_perform_move", 1);
+			packetSender.write(this.blazingEightsPerformMoveType);
+			packetSender.write(this.blazingEightsPerformMoveValue);
+			this.blazingEightsPerformMove = false;
+		}
 	}
 
 	private void writePacketScrabble(PacketSender packetSender) {
@@ -264,7 +295,48 @@ public class GameClient extends Client {
 	}
 
 	private void readPacketBlazingEights(PacketListener packetListener, String sectionName, int elementAmt) {
+		switch (sectionName) {
+		case "blazing_eights_start_game": {
+			this.blazingEightsStartingGame = true;
+			this.blazingEightsMoveOrder = new ArrayList<>();
+			this.blazingEightsCardAmt = new HashMap<>();
+			this.blazingEightsMoveIndex = 0;
 
+			for (int i = 0; i < elementAmt; i++) {
+				int id = packetListener.readInt();
+				int cardAmt = packetListener.readInt();
+				this.blazingEightsMoveOrder.add(id);
+				this.blazingEightsCardAmt.put(id, cardAmt);
+			}
+			break;
+		}
+
+		case "blazing_eights_end_game": {
+			this.blazingEightsEndingGame = true;
+			break;
+		}
+
+		case "blazing_eights_move_performed": {
+			this.blazingEightsMovePerformed = true;
+			this.blazingEightsMovePlayer = packetListener.readInt();
+			this.blazingEightsMoveType = packetListener.readInt();
+			this.blazingEightsMoveValue = packetListener.readInt();
+			this.blazingEightsMoveIndex = packetListener.readInt();
+
+			switch (this.blazingEightsMoveType) {
+			case BlazingEightsState.MOVE_PLAY: {
+				this.blazingEightsCardAmt.put(this.blazingEightsMovePlayer, this.blazingEightsCardAmt.get(this.blazingEightsMovePlayer) - 1);
+				break;
+			}
+
+			case BlazingEightsState.MOVE_DRAW: {
+				this.blazingEightsCardAmt.put(this.blazingEightsMovePlayer, this.blazingEightsCardAmt.get(this.blazingEightsMovePlayer) + this.blazingEightsMoveValue);
+				break;
+			}
+			}
+			break;
+		}
+		}
 	}
 
 	private void readPacketScrabble(PacketListener packetListener, String sectionName, int elementAmt) {
@@ -404,6 +476,65 @@ public class GameClient extends Client {
 			break;
 		}
 		}
+	}
+
+	public void resetBlazingEightsGameInfo() {
+		this.blazingEightsCardAmt.clear();
+		this.blazingEightsMoveOrder.clear();
+		this.blazingEightsStartingGame = false;
+		this.blazingEightsStartGame = false;
+		this.blazingEightsEndingGame = false;
+		this.blazingEightsMoveIndex = 0;
+	}
+
+	public int blazingEightsGetNextPlayer() {
+		return this.blazingEightsMoveOrder.get(this.blazingEightsMoveIndex);
+	}
+
+	public boolean blazingEightsIsMyTurn() {
+		return this.blazingEightsMoveOrder.get(this.blazingEightsMoveIndex) == this.getID();
+	}
+
+	public int[] blazingEightsGetPerformedMove() {
+		if (!this.blazingEightsMovePerformed) {
+			return null;
+		}
+		this.blazingEightsMovePerformed = false;
+		return new int[] { this.blazingEightsMovePlayer, this.blazingEightsMoveType, this.blazingEightsMoveValue };
+	}
+
+	public void blazingEightsPerformMove(int type, int value) {
+		this.blazingEightsPerformMove = true;
+		this.blazingEightsPerformMoveType = type;
+		this.blazingEightsPerformMoveValue = value;
+	}
+
+	public ArrayList<Integer> blazingEightsGetMoveOrder() {
+		return this.blazingEightsMoveOrder;
+	}
+
+	public HashMap<Integer, Integer> blazingEightsGetCardAmt() {
+		return this.blazingEightsCardAmt;
+	}
+
+	public void blazingEightsStartGame() {
+		this.blazingEightsStartGame = true;
+	}
+
+	public boolean blazingEightsIsGameStarting() {
+		if (!this.blazingEightsStartingGame) {
+			return false;
+		}
+		this.blazingEightsStartingGame = false;
+		return true;
+	}
+
+	public boolean blazingEightsIsGameEnding() {
+		if (!this.blazingEightsEndingGame) {
+			return false;
+		}
+		this.blazingEightsEndingGame = false;
+		return true;
 	}
 
 	public void resetScrabbleGameInfo() {

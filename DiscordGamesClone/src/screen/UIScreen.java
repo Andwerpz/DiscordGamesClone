@@ -30,8 +30,15 @@ public class UIScreen extends Screen {
 	private Framebuffer colorIDBuffer;
 	private Texture colorIDMap;
 
+	//if set to true, this will clear the color id buffer upon every call of render(), 
+	//as opposed to only clearing it once each frame. 
 	private boolean clearColorIDBufferOnRender = false;
-	
+
+	//if set to true, then the depth testing will be reversed when drawing to the colorID buffer. 
+	//this allows buttons to work better, as the button background will be drawn over the text,
+	//but in other cases where you want proper depth ids, you should turn this off. 
+	private boolean reverseDepthColorID = true;
+
 	private float left, right, bottom, top, near, far;
 
 	public UIScreen() {
@@ -65,47 +72,47 @@ public class UIScreen extends Screen {
 		this.colorIDBuffer.bindTextureToBuffer(GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, this.colorIDMap.getID());
 		this.colorIDBuffer.setDrawBuffers(new int[] { GL_COLOR_ATTACHMENT0 });
 		this.colorIDBuffer.isComplete();
-		
+
 		this.left = 0;
 		this.right = Main.windowWidth;
 		this.bottom = 0;
 		this.top = Main.windowHeight;
 		this.near = -1000;
 		this.far = 1000;
-		
+
 		this.camera = new Camera(Mat4.orthographic(left, right, bottom, top, near, far));
 	}
-	
+
 	public void setLeft(float f) {
 		this.left = f;
 		this.updateCamera();
 	}
-	
+
 	public void setRight(float f) {
 		this.right = f;
 		this.updateCamera();
 	}
-	
+
 	public void setBottom(float f) {
 		this.bottom = f;
 		this.updateCamera();
 	}
-	
+
 	public void setTop(float f) {
 		this.top = f;
 		this.updateCamera();
 	}
-	
+
 	public void setNear(float f) {
 		this.near = f;
 		this.updateCamera();
 	}
-	
+
 	public void setFar(float f) {
 		this.far = f;
 		this.updateCamera();
 	}
-	
+
 	private void updateCamera() {
 		this.camera.setProjectionMatrix(Mat4.orthographic(left, right, bottom, top, near, far));
 	}
@@ -127,6 +134,10 @@ public class UIScreen extends Screen {
 
 	public void setClearColorIDBufferOnRender(boolean b) {
 		this.clearColorIDBufferOnRender = b;
+	}
+
+	public void setReverseDepthColorID(boolean b) {
+		this.reverseDepthColorID = b;
 	}
 
 	@Override
@@ -165,14 +176,16 @@ public class UIScreen extends Screen {
 		screenQuad.render();
 
 		// -- RENDER PROPER UI HITBOXES --
-		// we just reverse the depth det.
 		this.geometryBuffer.bind();
 		glEnable(GL_DEPTH_TEST);
-		glDepthFunc(GL_GREATER);
 		glEnable(GL_CULL_FACE);
 		glDisable(GL_BLEND);
-		glClearDepth(0); // minimum value
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+
+		if (this.reverseDepthColorID) {
+			glDepthFunc(GL_GREATER);
+			glClearDepth(0); // minimum value
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
+		}
 
 		Shader.GEOMETRY.enable();
 		Shader.GEOMETRY.setUniformMat4("pr_matrix", camera.getProjectionMatrix());

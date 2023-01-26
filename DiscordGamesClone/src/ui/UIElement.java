@@ -10,6 +10,7 @@ import main.Main;
 import model.FilledRectangle;
 import model.Model;
 import util.Mat4;
+import util.Vec2;
 
 public abstract class UIElement extends Entity {
 	//am i overengineering ui element alignment?
@@ -70,7 +71,13 @@ public abstract class UIElement extends Entity {
 	protected int horizontalAlignContent, verticalAlignContent;
 	protected float x, y; //reference coordinates for drawing
 	protected float z; //needed as float for layering purposes
+
 	protected float width, height;
+
+	//if true, will automatically stretch the width and/or height so that 
+	//width = parent.width - margin * 2, same for height. 
+	private boolean fillWidth, fillHeight;
+	private float fillWidthMargin, fillHeightMargin;
 
 	//denotes the bottom left point of the bounding rectangle for this ui element
 	//we want this to be int as opposed to float to not get any weird interpixel sampling issues
@@ -208,6 +215,22 @@ public abstract class UIElement extends Entity {
 		this.alignContents();
 	}
 
+	public void setFillWidth(boolean b) {
+		this.fillWidth = b;
+	}
+
+	public void setFillHeight(boolean b) {
+		this.fillHeight = b;
+	}
+
+	public void setFillWidthMargin(float margin) {
+		this.fillWidthMargin = margin;
+	}
+
+	public void setFillHeightMargin(float margin) {
+		this.fillHeightMargin = margin;
+	}
+
 	public void setMaterial(Material m) {
 		this.updateModelInstance(this.modelID, m);
 	}
@@ -278,6 +301,22 @@ public abstract class UIElement extends Entity {
 	}
 
 	protected void alignContents() {
+		if (this.fillWidth) {
+			float parentWidth = Main.windowWidth;
+			if (this.isBound()) {
+				parentWidth = this.getParent().getWidth();
+			}
+			this.width = parentWidth - this.fillWidthMargin * 2;
+		}
+
+		if (this.fillHeight) {
+			float parentHeight = Main.windowHeight;
+			if (this.isBound()) {
+				parentHeight = this.getParent().getHeight();
+			}
+			this.height = parentHeight - this.fillHeightMargin * 2;
+		}
+
 		switch (this.horizontalAlignContent) {
 		case ALIGN_CENTER:
 			this.alignedX = (this.x - this.width / 2);
@@ -326,21 +365,37 @@ public abstract class UIElement extends Entity {
 		this.clampAlignedCoordinatesToInt = b;
 	}
 
-	//these should be absolute coordinates, (relative to the scene origin)
-	public float getLeftBorder() {
+	public float getAlignedX() {
 		return this.alignedX;
 	}
 
-	public float getRightBorder() {
-		return this.alignedX + this.width;
-	}
-
-	public float getBottomBorder() {
+	public float getAlignedY() {
 		return this.alignedY;
 	}
 
+	//these should be absolute coordinates, (relative to the scene origin)
+	public float getLeftBorder() {
+		float ans = this.getAlignedX();
+		if (this.isBound()) {
+			ans += this.getParent().getLeftBorder();
+		}
+		return ans;
+	}
+
+	public float getRightBorder() {
+		return this.getLeftBorder() + this.getWidth();
+	}
+
+	public float getBottomBorder() {
+		float ans = this.getAlignedY();
+		if (this.isBound()) {
+			ans += this.getParent().getBottomBorder();
+		}
+		return ans;
+	}
+
 	public float getTopBorder() {
-		return this.alignedY + this.height;
+		return this.getBottomBorder() + this.getHeight();
 	}
 
 	public float getWidth() {
@@ -349,6 +404,16 @@ public abstract class UIElement extends Entity {
 
 	public float getHeight() {
 		return this.height;
+	}
+
+	public float getZ() {
+		return this.z;
+	}
+
+	public Vec2 getCenter() {
+		float x = (this.getLeftBorder() + this.getRightBorder()) / 2f;
+		float y = (this.getBottomBorder() + this.getTopBorder()) / 2f;
+		return new Vec2(x, y);
 	}
 
 	public float getRotationRads() {

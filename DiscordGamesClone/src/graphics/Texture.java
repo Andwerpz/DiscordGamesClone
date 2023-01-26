@@ -55,6 +55,10 @@ public class Texture {
 		this.textureID = this.load(img, loadOptions, minSampleType, magSampleType, 5);
 	}
 
+	public Texture(String path, int loadOptions, int minSampleType, int magSampleType) {
+		this.textureID = this.load(path, loadOptions, minSampleType, magSampleType, 5);
+	}
+
 	public Texture(int r, int g, int b, float a) {
 		BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 		int alpha = (int) MathUtils.clamp(0, 255, (int) (a * 255f));
