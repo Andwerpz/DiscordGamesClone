@@ -181,7 +181,7 @@ public class BlazingEightsState extends State {
 		int cardTextureWidth = 66;
 		int cardTextureHeight = 90;
 
-		ArrayList<BufferedImage> cardFronts = GraphicsTools.loadAnimation("/blazing_eights/blazing_eights_cards_front_fixed4.png", cardTextureWidth, cardTextureHeight);
+		ArrayList<BufferedImage> cardFronts = GraphicsTools.loadAnimation("/blazing_eights/blazing_eights_cards_front_fixed5.png", cardTextureWidth, cardTextureHeight);
 		ArrayList<BufferedImage> cardBacks = GraphicsTools.loadAnimation("/blazing_eights/blazing_eights_cards_back_fixed.png", cardTextureWidth, cardTextureHeight);
 
 		for (int i = 0; i < NR_CARDS; i++) {
