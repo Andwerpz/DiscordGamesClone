@@ -332,7 +332,7 @@ public class ScrabbleState extends State {
 			playerRect.setMaterial(this.lightGray);
 			playerRect.bind(scoreboardBackground);
 
-			Text nickText = new Text(playerRectGap, playerRectGap, nick, FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, HUD_TEXT_SCENE);
+			Text nickText = new Text(playerRectGap, playerRectGap, 0, playerRect.getWidth() - playerRectGap, nick, FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, HUD_TEXT_SCENE);
 			nickText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 			nickText.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
 			nickText.bind(playerRect);
@@ -847,10 +847,12 @@ public class ScrabbleState extends State {
 		boardScreen.render(outputBuffer);
 
 		uiScreen.setUIScene(HAND_CELL_SCENE);
+		uiScreen.setReverseDepthColorID(false);
 		uiScreen.render(outputBuffer);
 		if (this.cellRects.containsKey(uiScreen.getEntityIDAtMouse())) {
 			this.hoveredCellID = uiScreen.getEntityIDAtMouse();
 		}
+		uiScreen.setReverseDepthColorID(true);
 
 		uiScreen.setUIScene(HAND_TILE_SCENE);
 		uiScreen.render(outputBuffer);

@@ -512,6 +512,10 @@ public class BlazingEightsState extends State {
 			this.drawHUD();
 			this.drawInputs();
 
+			if (this.playerMoveIndicator != null) {
+				this.playerMoveIndicator.kill();
+			}
+
 			this.playerMoveIndicator = new Text(0, 0, ">", FontUtils.ggsans.deriveFont(Font.BOLD), 36, Color.WHITE, MOVE_INDICATOR_SCENE);
 			this.playerMoveIndicator.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 			this.playerMoveIndicator.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_CENTER);
