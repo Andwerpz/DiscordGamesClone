@@ -1,5 +1,6 @@
 package server;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -335,7 +336,7 @@ public class GameServer extends Server {
 	}
 
 	@Override
-	public void readPacket(PacketListener packetListener, int clientID) {
+	public void readPacket(PacketListener packetListener, int clientID) throws IOException {
 		while (packetListener.hasMoreBytes()) {
 			String sectionName = packetListener.readSectionHeader();
 			int elementAmt = packetListener.getSectionElementAmt();
@@ -344,8 +345,10 @@ public class GameServer extends Server {
 			case "set_nickname": {
 				int nickLength = packetListener.readInt();
 				String nickname = packetListener.readString(nickLength);
-				this.serverMessages.add(this.playerNicknames.get(clientID) + " changed their name to " + nickname);
-				this.playerNicknames.put(clientID, nickname);
+				if (nickLength <= 100) {
+					this.serverMessages.add(this.playerNicknames.get(clientID) + " changed their name to " + nickname);
+					this.playerNicknames.put(clientID, nickname);
+				}
 				break;
 			}
 
@@ -380,7 +383,7 @@ public class GameServer extends Server {
 		}
 	}
 
-	public void readPacketBlazingEights(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
+	public void readPacketBlazingEights(PacketListener packetListener, int clientID, String sectionName, int elementAmt) throws IOException {
 		switch (sectionName) {
 		case "blazing_eights_start_game": {
 			this.blazingEightsStartingGame = true;
@@ -452,7 +455,7 @@ public class GameServer extends Server {
 		}
 	}
 
-	public void readPacketScrabble(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
+	public void readPacketScrabble(PacketListener packetListener, int clientID, String sectionName, int elementAmt) throws IOException {
 		switch (sectionName) {
 		case "scrabble_start_game": {
 			this.scrabbleRoundsLeft = packetListener.readInt();
@@ -527,7 +530,7 @@ public class GameServer extends Server {
 		}
 	}
 
-	public void readPacketChess(PacketListener packetListener, int clientID, String sectionName, int elementAmt) {
+	public void readPacketChess(PacketListener packetListener, int clientID, String sectionName, int elementAmt) throws IOException {
 		switch (sectionName) {
 		case "chess_create_game": {
 			ChessGame newGame = new ChessGame();

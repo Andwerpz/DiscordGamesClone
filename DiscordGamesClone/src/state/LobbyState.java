@@ -121,7 +121,7 @@ public class LobbyState extends State {
 
 	private boolean failedToConnect = false;
 
-	private static String versionNumber = "v0.2.1";
+	private static String versionNumber = "v0.2.2";
 
 	public LobbyState(StateManager sm, String ip, int port, boolean hosting) {
 		super(sm);

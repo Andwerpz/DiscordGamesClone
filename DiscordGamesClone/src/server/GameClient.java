@@ -1,5 +1,6 @@
 package server;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -217,7 +218,7 @@ public class GameClient extends Client {
 	}
 
 	@Override
-	public void readPacket(PacketListener packetListener) {
+	public void readPacket(PacketListener packetListener) throws IOException {
 		while (packetListener.hasMoreBytes()) {
 			String sectionName = packetListener.readSectionHeader();
 			int elementAmt = packetListener.getSectionElementAmt();
@@ -294,7 +295,7 @@ public class GameClient extends Client {
 		}
 	}
 
-	private void readPacketBlazingEights(PacketListener packetListener, String sectionName, int elementAmt) {
+	private void readPacketBlazingEights(PacketListener packetListener, String sectionName, int elementAmt) throws IOException {
 		switch (sectionName) {
 		case "blazing_eights_start_game": {
 			this.blazingEightsStartingGame = true;
@@ -339,7 +340,7 @@ public class GameClient extends Client {
 		}
 	}
 
-	private void readPacketScrabble(PacketListener packetListener, String sectionName, int elementAmt) {
+	private void readPacketScrabble(PacketListener packetListener, String sectionName, int elementAmt) throws IOException {
 		switch (sectionName) {
 		case "scrabble_start_game": {
 			this.scrabbleGame = new ScrabbleGame();
@@ -399,7 +400,7 @@ public class GameClient extends Client {
 		}
 	}
 
-	private void readPacketChess(PacketListener packetListener, String sectionName, int elementAmt) {
+	private void readPacketChess(PacketListener packetListener, String sectionName, int elementAmt) throws IOException {
 		switch (sectionName) {
 		case "chess_lobby_updates": {
 			this.chessHasLobbyUpdates = true;
