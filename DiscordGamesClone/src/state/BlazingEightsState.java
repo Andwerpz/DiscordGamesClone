@@ -53,6 +53,8 @@ public class BlazingEightsState extends State {
 
 	private static final int MOVE_INDICATOR_SCENE = 5;
 
+	private static final int LOGO_SCENE = 6;
+
 	private UIScreen uiScreen;
 
 	private GameClient client;
@@ -135,11 +137,17 @@ public class BlazingEightsState extends State {
 	private HashMap<Integer, UIFilledRectangle> playerNameRects;
 	private Text playerMoveIndicator;
 
+	private UIFilledRectangle logoRect;
+
+	private long startTime;
+
 	public BlazingEightsState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm);
 
 		this.client = client;
 		this.mainLobbyState = mainLobbyState;
+
+		this.startTime = System.currentTimeMillis();
 	}
 
 	@Override
@@ -205,11 +213,20 @@ public class BlazingEightsState extends State {
 		this.clearScene(BACKGROUND_SCENE);
 		this.clearScene(CARD_SCENE);
 		this.clearScene(MOVE_INDICATOR_SCENE);
+		this.clearScene(LOGO_SCENE);
 
 		UIFilledRectangle backgroundRect = new UIFilledRectangle(0, 0, 0, Main.windowWidth, Main.windowHeight, BACKGROUND_SCENE);
 		backgroundRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		backgroundRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 		backgroundRect.setMaterial(LobbyState.lightGray);
+
+		this.logoRect = new UIFilledRectangle(100, 0, 0, 400, 250, new FilledRectangle(), LOGO_SCENE);
+		this.logoRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+		this.logoRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
+		this.logoRect.setClampAlignedCoordinatesToInt(false);
+		this.logoRect.setTextureMaterial(new TextureMaterial(new Texture("/blazing_eights/blazing_eights_logo.png", Texture.VERTICAL_FLIP_BIT)));
+
+		this.cardsToPlayerRemaining = 7;
 
 		this.drawHUD();
 		this.drawInputs();
@@ -226,6 +243,10 @@ public class BlazingEightsState extends State {
 				Button startGameBtn = new Button(20, 20, 200, 80, "btn_start_game", "Start Game", FontUtils.ggsans.deriveFont(Font.BOLD), 36, INPUT_SCENE);
 				startGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 				startGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
+
+				Button leaveGameBtn = new Button(20, 20 + 80 + 20, 200, 80, "btn_leave_game", "Leave Game", FontUtils.ggsans.deriveFont(Font.BOLD), 36, INPUT_SCENE);
+				leaveGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
+				leaveGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 			}
 		}
 	}
@@ -605,6 +626,21 @@ public class BlazingEightsState extends State {
 			this.applyImpulseToCard(new Vec2(0, 0).add(new Vec2(this.cardWidthPx / 2, this.cardHeightPx / 2)), 0, 0, this.deckCover.getID());
 		}
 
+		//logo position
+		float ty = 100;
+		float cy = this.logoRect.getYOffset();
+		if (this.isInGame) {
+			ty = -this.logoRect.getHeight() - 100;
+		}
+		else {
+			float curMs = System.currentTimeMillis() - this.startTime;
+			curMs /= 1000f;
+			ty += (float) (Math.sin(curMs) * 10f);
+		}
+		float diff = ty - cy;
+		this.logoRect.setFrameAlignmentOffset(100, cy + diff * 0.1f);
+		this.logoRect.align();
+
 		// -- ANIMATIONS --
 		HashSet<Long> toRemove = new HashSet<>();
 		for (long id : this.cardVels.keySet()) {
@@ -674,6 +710,9 @@ public class BlazingEightsState extends State {
 		this.uiScreen.render(outputBuffer);
 		this.hoveredCardID = uiScreen.getEntityIDAtMouse();
 
+		this.uiScreen.setUIScene(LOGO_SCENE);
+		this.uiScreen.render(outputBuffer);
+
 		this.uiScreen.setUIScene(INPUT_SCENE);
 		this.uiScreen.setReverseDepthColorID(true);
 		this.uiScreen.render(outputBuffer);
@@ -732,6 +771,11 @@ public class BlazingEightsState extends State {
 		switch (Input.getClicked()) {
 		case "btn_start_game": {
 			this.client.blazingEightsStartGame();
+			break;
+		}
+
+		case "btn_leave_game": {
+			this.client.returnToMainLobby();
 			break;
 		}
 		}

@@ -600,8 +600,8 @@ public class GameServer extends Server {
 	}
 
 	public void resetBlazingEightsGameInfo() {
-		this.blazingEightsCardAmt.clear();
-		this.blazingEightsMoveOrder.clear();
+		this.blazingEightsCardAmt = null;
+		this.blazingEightsMoveOrder = null;
 		this.blazingEightsStartingGame = false;
 		this.blazingEightsEndingGame = false;
 		this.blazingEightsMovePerformed = false;
