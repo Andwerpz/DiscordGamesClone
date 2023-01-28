@@ -427,6 +427,14 @@ public class GameServer extends Server {
 				case BlazingEightsState.VALUE_ADDTWO:
 					this.blazingEightsDrawPenalty += 2;
 					break;
+
+				case BlazingEightsState.VALUE_ADDTWOHUNDRED:
+					this.blazingEightsDrawPenalty += 200;
+					break;
+
+				case BlazingEightsState.VALUE_WILDCARDADDFOUR:
+					this.blazingEightsDrawPenalty += 4;
+					break;
 				}
 				break;
 			}
@@ -436,7 +444,10 @@ public class GameServer extends Server {
 					this.blazingEightsMoveValue = this.blazingEightsDrawPenalty;
 					this.blazingEightsDrawPenalty = 0;
 				}
-				this.blazingEightsCardAmt.put(clientID, this.blazingEightsCardAmt.get(clientID) + this.blazingEightsMoveValue);
+				int curCardAmt = this.blazingEightsCardAmt.get(clientID);
+				this.blazingEightsMoveValue = Math.min(BlazingEightsState.CARD_AMT_LIMIT - curCardAmt, this.blazingEightsMoveValue);
+				curCardAmt += this.blazingEightsMoveValue;
+				this.blazingEightsCardAmt.put(clientID, curCardAmt);
 				break;
 			}
 			}

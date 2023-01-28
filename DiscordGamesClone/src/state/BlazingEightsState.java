@@ -78,9 +78,12 @@ public class BlazingEightsState extends State {
 	public static final int VALUE_SKIP = 10;
 	public static final int VALUE_REVERSE = 11;
 	public static final int VALUE_ADDTWO = 12;
+	public static final int VALUE_ADDTWOHUNDRED = 13;
+	public static final int VALUE_WILDCARD = 14;
+	public static final int VALUE_WILDCARDADDFOUR = 15;
 
 	private static final int NR_SUITS = 4;
-	private static final int NR_VALUES = 13;
+	private static final int NR_VALUES = 16;
 	private static final int NR_CARDS = NR_SUITS * NR_VALUES;
 
 	private static final float ZOFFSET_TABLE = -100;
@@ -91,6 +94,8 @@ public class BlazingEightsState extends State {
 
 	public static final int MOVE_PLAY = 0;
 	public static final int MOVE_DRAW = 1;
+
+	public static final int CARD_AMT_LIMIT = 200;
 
 	//we'll use these rects to generate the uifilled rectangles
 	//using only one rect for a given card lets us do instanced rendering 
@@ -174,6 +179,12 @@ public class BlazingEightsState extends State {
 			if (aType == bType) {
 				return Long.compare(a, b);
 			}
+			if (isWildcard(aType) && !isWildcard(bType)) {
+				return -1;
+			}
+			if (!isWildcard(aType) && isWildcard(bType)) {
+				return 1;
+			}
 			int[] asv = getCardSuitAndValue(aType);
 			int[] bsv = getCardSuitAndValue(bType);
 			if (asv[0] == bsv[0]) {
@@ -189,7 +200,7 @@ public class BlazingEightsState extends State {
 		int cardTextureWidth = 66;
 		int cardTextureHeight = 90;
 
-		ArrayList<BufferedImage> cardFronts = GraphicsTools.loadAnimation("/blazing_eights/blazing_eights_cards_front_fixed5.png", cardTextureWidth, cardTextureHeight);
+		ArrayList<BufferedImage> cardFronts = GraphicsTools.loadAnimation("/blazing_eights/blazing_eights_gcards_fixed.png", cardTextureWidth, cardTextureHeight);
 		ArrayList<BufferedImage> cardBacks = GraphicsTools.loadAnimation("/blazing_eights/blazing_eights_cards_back_fixed.png", cardTextureWidth, cardTextureHeight);
 
 		for (int i = 0; i < NR_CARDS; i++) {
@@ -295,7 +306,7 @@ public class BlazingEightsState extends State {
 				int iconWidth = 11 * 2;
 				int iconHeight = 15 * 2;
 
-				for (int j = 0; j < numCards; j++) {
+				for (int j = 0; j < Math.min(numCards, 25); j++) {
 					UIFilledRectangle iconRect = new UIFilledRectangle(5 + iconXInterval * j, this.opponentHUDYInterval * i + nickBackground.getHeight() + 5, 0, iconWidth, iconHeight, this.cardIconRect, HUD_SCENE);
 					iconRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
 					iconRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
@@ -310,7 +321,7 @@ public class BlazingEightsState extends State {
 	}
 
 	//suit major card sorting. 
-	public static int getCardID(int suit, int value) {
+	public static int getCardType(int suit, int value) {
 		return suit * NR_VALUES + value;
 	}
 
@@ -318,8 +329,20 @@ public class BlazingEightsState extends State {
 		return new int[] { type / NR_VALUES, type % NR_VALUES };
 	}
 
-	public static int generateRandomCardID() {
-		return (int) (Math.random() * NR_CARDS);
+	public static int generateRandomCardType() {
+		if (Math.random() < 0.001) {
+			return getCardType((int) (Math.random() * NR_SUITS), VALUE_ADDTWOHUNDRED);
+		}
+		int type = -1;
+		while (type == -1 || getCardSuitAndValue(type)[1] == VALUE_ADDTWOHUNDRED) {
+			type = (int) (Math.random() * NR_CARDS);
+		}
+		return type;
+	}
+
+	public static boolean isWildcard(int type) {
+		int value = getCardSuitAndValue(type)[1];
+		return value == VALUE_WILDCARD || value == VALUE_WILDCARDADDFOUR;
 	}
 
 	private UIFilledRectangle generateCardFront(int type) {
@@ -412,7 +435,7 @@ public class BlazingEightsState extends State {
 
 		UIFilledRectangle cardRect = null;
 		if (showFront) {
-			cardRect = this.generateCardFront((int) (Math.random() * NR_CARDS));
+			cardRect = this.generateCardFront(generateRandomCardType());
 		}
 		else {
 			cardRect = this.generateCardBack();
@@ -427,6 +450,10 @@ public class BlazingEightsState extends State {
 
 	//draws the card faceup
 	private void drawCardToHand() {
+		if (this.handCards.size() >= CARD_AMT_LIMIT) {
+			return;
+		}
+
 		UIFilledRectangle cardRect = this.drawCardFromDeck(true);
 
 		cardRect.setZ(ZOFFSET_HAND);
@@ -617,6 +644,12 @@ public class BlazingEightsState extends State {
 			this.drawCardToHand();
 		}
 
+		//stopping it early if the hand limit has already been reached. 
+		//might create some bugs if players move too fast hmm. 
+		if (this.handCards.size() >= CARD_AMT_LIMIT) {
+			this.cardsToPlayerRemaining = 0;
+		}
+
 		if (this.cardsToOpponentRemaining != 0) {
 			this.cardsToOpponentRemaining--;
 			this.drawCardToOpponent();
@@ -723,16 +756,45 @@ public class BlazingEightsState extends State {
 
 	}
 
+	//in the general case, you need to match either suit or value. 
+	//you can put anything on top of a wild card
+	//if the top card is a draw card, then you must play a draw card, or draw, if the previous move wasn't a draw. 
 	public boolean isValidMove(int cardType) {
 		if (this.topCardType == -1) {
+			//there currently is no top card
 			return true;
 		}
 		int topSuit = getCardSuitAndValue(this.topCardType)[0];
 		int topValue = getCardSuitAndValue(this.topCardType)[1];
 		int nextSuit = getCardSuitAndValue(cardType)[0];
 		int nextValue = getCardSuitAndValue(cardType)[1];
-		if (topValue == VALUE_ADDTWO && nextValue != VALUE_ADDTWO && !this.prevMoveWasDraw) {
+		boolean isTopAddCard = false;
+		boolean isTopWildCard = false;
+		boolean isNextAddCard = false;
+		boolean isNextWildCard = false;
+		if (topValue == VALUE_ADDTWO || topValue == VALUE_ADDTWOHUNDRED || topValue == VALUE_WILDCARDADDFOUR) {
+			isTopAddCard = true;
+		}
+		if (topValue == VALUE_WILDCARD || topValue == VALUE_WILDCARDADDFOUR) {
+			isTopWildCard = true;
+		}
+		if (nextValue == VALUE_ADDTWO || nextValue == VALUE_ADDTWOHUNDRED || nextValue == VALUE_WILDCARDADDFOUR) {
+			isNextAddCard = true;
+		}
+		if (nextValue == VALUE_WILDCARD || nextValue == VALUE_WILDCARDADDFOUR) {
+			isNextWildCard = true;
+		}
+		if (isTopAddCard && !isNextAddCard && !this.prevMoveWasDraw) {
 			return false;
+		}
+		if (isTopAddCard && isNextAddCard && !this.prevMoveWasDraw) {
+			return true;
+		}
+		if (isTopWildCard) {
+			return true;
+		}
+		if (isNextWildCard) {
+			return true;
 		}
 		if (topSuit == nextSuit || topValue == nextValue) {
 			//general case
