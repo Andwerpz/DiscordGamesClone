@@ -1,5 +1,6 @@
 package state;
 
+import java.awt.Color;
 import java.awt.Font;
 
 import audio.Sound;
@@ -22,6 +23,7 @@ import scene.Scene;
 import screen.PerspectiveScreen;
 import screen.Screen;
 import screen.UIScreen;
+import ui.Text;
 import ui.UIElement;
 import ui.UIFilledRectangle;
 import util.FontUtils;
@@ -52,10 +54,11 @@ public class MainMenuState extends State {
 
 	private float sideButtonBaseOffset = 30;
 	private float sideButtonMaxOffset = 150;
-	private float sideButtonOffset = sideButtonBaseOffset;
 	private int sideButtonWidth = (int) sideButtonMaxOffset;
 
 	private UIFilledRectangle logoRect;
+
+	public static String versionNumber = "v0.2.3";
 
 	public MainMenuState(StateManager sm) {
 		super(sm);
@@ -122,11 +125,12 @@ public class MainMenuState extends State {
 		joinGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
 		joinGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
-		Button settings = new Button(150, 80, 200, 30, "btn_settings", "Settings", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
-		settings.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
-		settings.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		//TODO fix this menu
+		//		Button settings = new Button(150, 80, 200, 30, "btn_settings", "Settings", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		//		settings.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
+		//		settings.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
-		Button quitGame = new Button(150, 120, 200, 30, "btn_quit_game", "Quit Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
+		Button quitGame = new Button(150, 80, 200, 30, "btn_quit_game", "Quit Game", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
 		quitGame.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
 		quitGame.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
@@ -142,9 +146,13 @@ public class MainMenuState extends State {
 		tfJoinPort.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
 		tfJoinPort.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
-		Button rightSideButton = new Button((int) this.sideButtonOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_side", ">", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
+		Button rightSideButton = new Button((int) this.sideButtonBaseOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_side", ">", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
 		rightSideButton.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 		rightSideButton.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+
+		Text versionText = new Text(10, 10, MainMenuState.versionNumber, FontUtils.ggsans, 16, Color.WHITE, DYNAMIC_UI_SCENE);
+		versionText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		versionText.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 	}
 
 	private void drawSettingsMenu() {
@@ -164,22 +172,18 @@ public class MainMenuState extends State {
 
 	@Override
 	public void update() {
-		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
+		Input.inputsHovered(uiScreen.getEntityIDAtMouse(), DYNAMIC_UI_SCENE);
 
 		this.logoRect.setRotationRads(this.logoRect.getRotationRads() + (float) Math.toRadians(1));
 
 		if (Input.getInput("btn_side") != null) {
 			Button sideButton = (Button) Input.getInput("btn_side");
-			float diff = 0;
-			if (sideButton.isHovered()) {
-				diff = this.sideButtonMaxOffset - this.sideButtonOffset;
+			if (sideButton.hasMouseEntered()) {
+				sideButton.easeXOffset(this.sideButtonMaxOffset);
 			}
-			else {
-				diff = this.sideButtonBaseOffset - this.sideButtonOffset;
+			if (sideButton.hasMouseExited()) {
+				sideButton.easeXOffset(this.sideButtonBaseOffset);
 			}
-			this.sideButtonOffset += diff * 0.1f;
-			sideButton.setFrameAlignmentOffset((int) this.sideButtonOffset, 0);
-			sideButton.align();
 		}
 	}
 
@@ -206,7 +210,7 @@ public class MainMenuState extends State {
 
 	@Override
 	public void mouseReleased(int button) {
-		Input.inputsReleased(uiScreen.getEntityIDAtMouse());
+		Input.inputsReleased(uiScreen.getEntityIDAtMouse(), DYNAMIC_UI_SCENE);
 		String clickedButton = Input.getClicked();
 		switch (clickedButton) {
 		case "btn_host_game":
@@ -248,6 +252,11 @@ public class MainMenuState extends State {
 
 		}
 
+	}
+
+	@Override
+	public void mouseScrolled(float wheelOffset, float smoothOffset) {
+		// TODO Auto-generated method stub
 	}
 
 	@Override

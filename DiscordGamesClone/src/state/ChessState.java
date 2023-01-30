@@ -44,7 +44,7 @@ import util.Vec2;
 import util.Vec3;
 import util.Vec4;
 
-public class ChessState extends State {
+public class ChessState extends GameState {
 	//ok, we have a few things left to do:
 	// -- IMPORTANT --
 	// - sound effects
@@ -70,11 +70,7 @@ public class ChessState extends State {
 	private static final int WIN_INFO_SCENE = 5;
 	private static final int WIN_INFO_TEXT_SCENE = 6;
 
-	private State mainLobbyState;
-
 	private UIScreen uiScreen; // Menu UI
-
-	private GameClient client;
 
 	private Vec3 lightGray = new Vec3(66, 69, 73).mul(1.0f / 255.0f);
 	private Vec3 lightBlue = new Vec3(114, 137, 218).mul(1.0f / 255.0f);
@@ -158,14 +154,11 @@ public class ChessState extends State {
 	private static TextureMaterial circleTexture;
 
 	public ChessState(StateManager sm, GameClient client, State mainLobbyState) {
-		super(sm);
-
-		this.mainLobbyState = mainLobbyState;
-		this.client = client;
+		super(sm, client, mainLobbyState);
 	}
 
 	@Override
-	public void load() {
+	public void _load() {
 		this.uiScreen = new UIScreen();
 
 		this.backgroundTexture = new TextureMaterial(new Texture("/chess/chess_background.png", Texture.VERTICAL_FLIP_BIT));
@@ -193,14 +186,11 @@ public class ChessState extends State {
 			ChessState.circleTexture = new TextureMaterial(new Texture("/chess/dot.png"));
 		}
 
-		Main.unlockCursor();
-		Entity.killAll();
-
 		this.drawLobby();
 	}
 
 	@Override
-	public void kill() {
+	public void _kill() {
 		this.uiScreen.kill();
 	}
 
@@ -226,13 +216,6 @@ public class ChessState extends State {
 		createGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 		createGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 		createGameBtn.bind(lobbyBackground);
-
-		if (this.client.isHost()) {
-			Button returnToMainLobbyBtn = new Button(10 + createGameBtn.getWidth() + 10, 10, 200, 30, "btn_return_to_main_lobby", "Return To Lobby", FontUtils.ggsans.deriveFont(Font.BOLD), 24, DYNAMIC_UI_SCENE);
-			returnToMainLobbyBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
-			returnToMainLobbyBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
-			returnToMainLobbyBtn.bind(lobbyBackground);
-		}
 
 		// -- Game Selector Buttons --
 		int xOffset = this.lobbyBackgroundMargin + 10;
@@ -281,6 +264,7 @@ public class ChessState extends State {
 		this.chessBoardBackground.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
 		this.chessBoardBackground.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 		this.chessBoardBackground.setMaterial(new Material(this.gray));
+		this.chessBoardBackground.align();
 
 		// -- STATIC UI --
 		this.clearScene(STATIC_UI_SCENE);
@@ -345,6 +329,8 @@ public class ChessState extends State {
 			}
 		}
 
+		UIElement.alignAllUIElements();
+
 		// -- SPECTATOR BOARD --
 		this.drawSpectatorBoard();
 
@@ -365,6 +351,8 @@ public class ChessState extends State {
 		if (this.spectatorBoard != null) {
 			this.spectatorBoard.kill();
 		}
+
+		System.out.println(this.chessBoardBackground.getRightBorder());
 
 		float spectatorBoardWidth = Main.windowWidth - this.chessBoardBackground.getRightBorder() - this.toEdgeMargin * 2;
 		float spectatorBoardHeight = leaveGameBtn.getBottomBorder() - this.toEdgeMargin * 2;
@@ -549,8 +537,8 @@ public class ChessState extends State {
 	}
 
 	@Override
-	public void update() {
-		Input.inputsHovered(this.uiScreen.getEntityIDAtMouse());
+	public void _update() {
+		Input.inputsHovered(this.uiScreen.getEntityIDAtMouse(), DYNAMIC_UI_SCENE);
 
 		// -- NETWORKING --
 		if (this.inLobby) {
@@ -586,10 +574,6 @@ public class ChessState extends State {
 				this.drawChessBoard();
 				this.drawBoardInfo();
 			}
-		}
-
-		if (this.client.getCurGame() == GameServer.LOBBY) {
-			this.sm.switchState(this.mainLobbyState);
 		}
 
 		if (this.client.chessHasLobbyUpdates()) {
@@ -635,7 +619,7 @@ public class ChessState extends State {
 	}
 
 	@Override
-	public void render(Framebuffer outputBuffer) {
+	public void _render(Framebuffer outputBuffer) {
 		uiScreen.setUIScene(BACKGROUND_UI_SCENE);
 		uiScreen.render(outputBuffer);
 		uiScreen.setUIScene(STATIC_UI_SCENE);
@@ -660,7 +644,7 @@ public class ChessState extends State {
 	}
 
 	@Override
-	public void mousePressed(int button) {
+	public void _mousePressed(int button) {
 		Input.inputsPressed(uiScreen.getEntityIDAtMouse());
 
 		//picking up a chess piece
@@ -699,9 +683,10 @@ public class ChessState extends State {
 	}
 
 	@Override
-	public void mouseReleased(int button) {
-		Input.inputsReleased(uiScreen.getEntityIDAtMouse());
+	public void _mouseReleased(int button) {
+		Input.inputsReleased(uiScreen.getEntityIDAtMouse(), DYNAMIC_UI_SCENE);
 		String clickedButton = Input.getClicked();
+		System.out.println(clickedButton);
 		switch (clickedButton.split(" ")[0]) {
 		case "btn_create_game": {
 			this.client.chessCreateGame();
@@ -720,11 +705,6 @@ public class ChessState extends State {
 		case "btn_join_game": {
 			int gameID = Integer.parseInt(clickedButton.split(" ")[1]);
 			this.client.chessJoinGame(gameID);
-			break;
-		}
-
-		case "btn_return_to_main_lobby": {
-			this.client.returnToMainLobby();
 			break;
 		}
 		}
@@ -765,12 +745,17 @@ public class ChessState extends State {
 	}
 
 	@Override
-	public void keyPressed(int key) {
+	public void _mouseScrolled(float wheelOffset, float smoothOffset) {
+		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public void _keyPressed(int key) {
 
 	}
 
 	@Override
-	public void keyReleased(int key) {
+	public void _keyReleased(int key) {
 
 	}
 

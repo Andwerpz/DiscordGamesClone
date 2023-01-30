@@ -25,11 +25,14 @@ public class KeyboardInput extends GLFWKeyCallback {
 
 	@Override
 	public void invoke(long window, int key, int scancode, int action, int mods) {
-		if(action == GLFW_PRESS) {
+		if (action == GLFW_PRESS) {
 			Main.main.keyPressed(key);
 		}
-		else if(action == GLFW_RELEASE) {
+		else if (action == GLFW_RELEASE) {
 			Main.main.keyReleased(key);
+		}
+		if (key < 0 || key >= keys.length) {
+			return;
 		}
 		keys[key] = action != GLFW.GLFW_RELEASE;
 	}

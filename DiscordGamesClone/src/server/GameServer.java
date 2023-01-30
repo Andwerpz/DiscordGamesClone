@@ -2,6 +2,7 @@ package server;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -181,7 +182,7 @@ public class GameServer extends Server {
 		if (this.blazingEightsStartingGame) {
 			packetSender.writeSectionHeader("blazing_eights_start_game", this.players.size());
 
-			for (int id : this.players) {
+			for (int id : this.blazingEightsMoveOrder) {
 				packetSender.write(id);
 				packetSender.write(this.blazingEightsCardAmt.get(id));
 			}
@@ -398,6 +399,7 @@ public class GameServer extends Server {
 				this.blazingEightsMoveOrder.add(id);
 				this.blazingEightsCardAmt.put(id, 7);
 			}
+			Collections.shuffle(this.blazingEightsMoveOrder);
 			break;
 		}
 

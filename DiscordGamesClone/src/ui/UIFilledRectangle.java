@@ -32,7 +32,7 @@ public class UIFilledRectangle extends UIElement {
 	}
 
 	@Override
-	protected void update() {
+	protected void _update() {
 
 	}
 

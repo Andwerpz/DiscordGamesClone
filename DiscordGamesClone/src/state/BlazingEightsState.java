@@ -41,7 +41,7 @@ import util.GraphicsTools;
 import util.Vec2;
 import util.Vec3;
 
-public class BlazingEightsState extends State {
+public class BlazingEightsState extends GameState {
 
 	private static final int BACKGROUND_SCENE = 0;
 	private static final int INPUT_SCENE = 1;
@@ -56,9 +56,6 @@ public class BlazingEightsState extends State {
 	private static final int LOGO_SCENE = 6;
 
 	private UIScreen uiScreen;
-
-	private GameClient client;
-	private State mainLobbyState;
 
 	private static final int SUIT_DIAMOND = 0;
 	private static final int SUIT_CLUB = 1;
@@ -146,20 +143,16 @@ public class BlazingEightsState extends State {
 
 	private long startTime;
 
-	public BlazingEightsState(StateManager sm, GameClient client, State mainLobbyState) {
-		super(sm);
+	private boolean hasMoved = false;
 
-		this.client = client;
-		this.mainLobbyState = mainLobbyState;
+	public BlazingEightsState(StateManager sm, GameClient client, State mainLobbyState) {
+		super(sm, client, mainLobbyState);
 
 		this.startTime = System.currentTimeMillis();
 	}
 
 	@Override
-	public void load() {
-		Entity.killAll();
-		Main.unlockCursor();
-
+	public void _load() {
 		this.uiScreen = new UIScreen();
 		this.uiScreen.setClearColorIDBufferOnRender(true);
 
@@ -254,10 +247,6 @@ public class BlazingEightsState extends State {
 				Button startGameBtn = new Button(20, 20, 200, 80, "btn_start_game", "Start Game", FontUtils.ggsans.deriveFont(Font.BOLD), 36, INPUT_SCENE);
 				startGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 				startGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
-
-				Button leaveGameBtn = new Button(20, 20 + 80 + 20, 200, 80, "btn_leave_game", "Leave Game", FontUtils.ggsans.deriveFont(Font.BOLD), 36, INPUT_SCENE);
-				leaveGameBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
-				leaveGameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 			}
 		}
 	}
@@ -514,21 +503,18 @@ public class BlazingEightsState extends State {
 	}
 
 	@Override
-	public void kill() {
+	public void _kill() {
 		this.uiScreen.kill();
 	}
 
 	@Override
-	public void update() {
-		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
+	public void _update() {
+		Input.inputsHovered(uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 
 		// -- NETWORKING --
-		if (this.client.getCurGame() == GameServer.LOBBY) {
-			this.sm.switchState(this.mainLobbyState);
-		}
-
 		if (this.client.blazingEightsIsGameStarting()) {
 			this.isInGame = true;
+			this.hasMoved = false;
 			this.removeAllCardsFromSet(this.handCards);
 			this.removeAllCardsFromSet(this.tableCards);
 			this.topCardType = -1;
@@ -557,6 +543,7 @@ public class BlazingEightsState extends State {
 		if (this.isInGame) {
 			int[] nextMove = this.client.blazingEightsGetPerformedMove();
 			if (nextMove != null) {
+				this.hasMoved = false;
 				int movePlayer = nextMove[0];
 				int moveType = nextMove[1];
 				int moveValue = nextMove[2];
@@ -730,7 +717,7 @@ public class BlazingEightsState extends State {
 	}
 
 	@Override
-	public void render(Framebuffer outputBuffer) {
+	public void _render(Framebuffer outputBuffer) {
 		this.uiScreen.setUIScene(BACKGROUND_SCENE);
 		this.uiScreen.render(outputBuffer);
 
@@ -753,7 +740,6 @@ public class BlazingEightsState extends State {
 		this.uiScreen.setUIScene(INPUT_SCENE);
 		this.uiScreen.setReverseDepthColorID(true);
 		this.uiScreen.render(outputBuffer);
-
 	}
 
 	//in the general case, you need to match either suit or value. 
@@ -804,7 +790,7 @@ public class BlazingEightsState extends State {
 	}
 
 	@Override
-	public void mousePressed(int button) {
+	public void _mousePressed(int button) {
 		Input.inputsPressed(this.uiScreen.getEntityIDAtMouse());
 		if (!this.isInGame) {
 			if (this.hoveredCardID == this.deckCover.getID()) {
@@ -816,15 +802,17 @@ public class BlazingEightsState extends State {
 			}
 		}
 		else {
-			if (this.client.blazingEightsIsMyTurn()) {
+			if (this.client.blazingEightsIsMyTurn() && !this.hasMoved) {
 				if (this.hoveredCardID == this.deckCover.getID()) {
 					this.client.blazingEightsPerformMove(MOVE_DRAW, 1);
+					this.hasMoved = true;
 				}
 				else if (this.handCards.contains(this.hoveredCardID)) {
 					int cardType = this.cardTypes.get(this.hoveredCardID);
 					if (this.isValidMove(cardType)) {
 						this.client.blazingEightsPerformMove(MOVE_PLAY, cardType);
 						this.playCardToTable(this.hoveredCardID);
+						this.hasMoved = true;
 					}
 				}
 			}
@@ -832,29 +820,29 @@ public class BlazingEightsState extends State {
 	}
 
 	@Override
-	public void mouseReleased(int button) {
-		Input.inputsReleased(this.uiScreen.getEntityIDAtMouse());
+	public void _mouseReleased(int button) {
+		Input.inputsReleased(this.uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 		switch (Input.getClicked()) {
 		case "btn_start_game": {
 			this.client.blazingEightsStartGame();
 			break;
 		}
-
-		case "btn_leave_game": {
-			this.client.returnToMainLobby();
-			break;
-		}
 		}
 	}
 
 	@Override
-	public void keyPressed(int key) {
+	public void _mouseScrolled(float wheelOffset, float smoothOffset) {
+		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public void _keyPressed(int key) {
 		// TODO Auto-generated method stub
 
 	}
 
 	@Override
-	public void keyReleased(int key) {
+	public void _keyReleased(int key) {
 		// TODO Auto-generated method stub
 
 	}

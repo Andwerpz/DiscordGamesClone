@@ -83,8 +83,6 @@ public class LobbyState extends State {
 
 	private float sideButtonBaseOffset = 30;
 	private float sideButtonMaxOffset = 150;
-	private float leftSideButtonOffset = sideButtonBaseOffset;
-	private float rightSideButtonOffset = sideButtonBaseOffset;
 	private int sideButtonWidth = (int) sideButtonMaxOffset;
 
 	private float startButtonHeight = 80;
@@ -120,8 +118,6 @@ public class LobbyState extends State {
 	private ArrayList<TextureMaterial> backgroundColorIDTextures;
 
 	private boolean failedToConnect = false;
-
-	private static String versionNumber = "v0.2.2";
 
 	public LobbyState(StateManager sm, String ip, int port, boolean hosting) {
 		super(sm);
@@ -284,11 +280,11 @@ public class LobbyState extends State {
 		nicknameBtn.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_BOTTOM);
 		nicknameBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 
-		Button rightSideButton = new Button((int) this.rightSideButtonOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_right_side", ">", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
+		Button rightSideButton = new Button((int) this.sideButtonBaseOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_right_side", ">", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
 		rightSideButton.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 		rightSideButton.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
-		Button leftSideButton = new Button((int) this.leftSideButtonOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_left_side", "<", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
+		Button leftSideButton = new Button((int) this.sideButtonBaseOffset, 0, this.sideButtonWidth, Main.windowHeight, "btn_left_side", "<", FontUtils.ggsans.deriveFont(Font.BOLD), 48, DYNAMIC_UI_SCENE);
 		leftSideButton.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		leftSideButton.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
 
@@ -309,7 +305,7 @@ public class LobbyState extends State {
 		helloText.setFrameAlignmentStyle(UIElement.FROM_CENTER_RIGHT, UIElement.FROM_TOP);
 		helloText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
 
-		Text versionText = new Text(20, 20, versionNumber, FontUtils.ggsans, 16, Color.WHITE, LOBBY_MAIN_DYNAMIC);
+		Text versionText = new Text(20, 20, MainMenuState.versionNumber, FontUtils.ggsans, 16, Color.WHITE, LOBBY_MAIN_DYNAMIC);
 		versionText.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 		versionText.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
 
@@ -330,34 +326,26 @@ public class LobbyState extends State {
 			this.returnToMainMenu();
 		}
 
-		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
+		Input.inputsHovered(uiScreen.getEntityIDAtMouse(), DYNAMIC_UI_SCENE);
 
 		if (Input.getInput("btn_right_side") != null) {
 			Button sideButton = (Button) Input.getInput("btn_right_side");
-			float diff = 0;
-			if (sideButton.isHovered()) {
-				diff = this.sideButtonMaxOffset - this.rightSideButtonOffset;
+			if (sideButton.hasMouseEntered()) {
+				sideButton.easeXOffset(this.sideButtonMaxOffset);
 			}
-			else {
-				diff = this.sideButtonBaseOffset - this.rightSideButtonOffset;
+			if (sideButton.hasMouseExited()) {
+				sideButton.easeXOffset(this.sideButtonBaseOffset);
 			}
-			this.rightSideButtonOffset += diff * 0.1f;
-			sideButton.setFrameAlignmentOffset((int) this.rightSideButtonOffset, 0);
-			sideButton.align();
 		}
 
 		if (Input.getInput("btn_left_side") != null) {
 			Button sideButton = (Button) Input.getInput("btn_left_side");
-			float diff = 0;
-			if (sideButton.isHovered()) {
-				diff = this.sideButtonMaxOffset - this.leftSideButtonOffset;
+			if (sideButton.hasMouseEntered()) {
+				sideButton.easeXOffset(this.sideButtonMaxOffset);
 			}
-			else {
-				diff = this.sideButtonBaseOffset - this.leftSideButtonOffset;
+			if (sideButton.hasMouseExited()) {
+				sideButton.easeXOffset(this.sideButtonBaseOffset);
 			}
-			this.leftSideButtonOffset += diff * 0.1f;
-			sideButton.setFrameAlignmentOffset((int) this.leftSideButtonOffset, 0);
-			sideButton.align();
 		}
 
 		if (Input.getInput("btn_start_game") != null) {
@@ -469,12 +457,6 @@ public class LobbyState extends State {
 
 	@Override
 	public void render(Framebuffer outputBuffer) {
-		//		perspectiveScreen.renderSkybox(true);
-		//		perspectiveScreen.renderDecals(false);
-		//		perspectiveScreen.renderPlayermodel(false);
-		//		perspectiveScreen.setWorldScene(PERSPECTIVE_BACKGROUND_SCENE);
-		//		perspectiveScreen.render(outputBuffer);
-
 		this.lobbyMainFramebuffer.bind();
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // clear the framebuffer
 
@@ -500,7 +482,7 @@ public class LobbyState extends State {
 
 	@Override
 	public void mouseReleased(int button) {
-		Input.inputsReleased(uiScreen.getEntityIDAtMouse());
+		Input.inputsReleased(uiScreen.getEntityIDAtMouse(), DYNAMIC_UI_SCENE);
 		String clickedButton = Input.getClicked();
 		switch (clickedButton) {
 		case "btn_right_side": {
@@ -577,6 +559,11 @@ public class LobbyState extends State {
 
 		}
 
+	}
+
+	@Override
+	public void mouseScrolled(float wheelOffset, float smoothOffset) {
+		// TODO Auto-generated method stub
 	}
 
 	@Override

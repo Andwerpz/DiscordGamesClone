@@ -43,7 +43,7 @@ import util.Vec2;
 import util.Vec3;
 import util.Vec4;
 
-public class ScrabbleState extends State {
+public class ScrabbleState extends GameState {
 
 	//the server will create an scrabble game based off of the host's specifications, and will communicate
 	//all the relevant information to the clients. 
@@ -96,9 +96,6 @@ public class ScrabbleState extends State {
 	private Material darkGray = new Material(new Vec3(40, 43, 48).mul(1.0f / 255.0f));
 
 	private TextureMaterial tileTexture;
-
-	private GameClient client;
-	private State mainLobbyState;
 
 	private UIScreen uiScreen;
 	private UIScreen boardScreen;
@@ -169,22 +166,16 @@ public class ScrabbleState extends State {
 	private HashMap<Integer, Integer> playerScores;
 
 	public ScrabbleState(StateManager sm, GameClient client, State mainLobbyState) {
-		super(sm);
-
-		this.client = client;
-		this.mainLobbyState = mainLobbyState;
+		super(sm, client, mainLobbyState);
 	}
 
 	@Override
-	public void load() {
+	public void _load() {
 		this.uiScreen = new UIScreen();
 		this.uiScreen.setClearColorIDBufferOnRender(false);
 
 		this.boardScreen = new UIScreen();
 		this.boardScreen.setClearColorIDBufferOnRender(true);
-
-		Main.unlockCursor();
-		Entity.killAll();
 
 		this.game = new ScrabbleGame();
 
@@ -223,7 +214,7 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void kill() {
+	public void _kill() {
 		this.uiScreen.kill();
 		this.boardScreen.kill();
 	}
@@ -289,16 +280,6 @@ public class ScrabbleState extends State {
 			roundCounter.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_TOP);
 			roundCounter.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 			roundCounter.bind(textAlignmentRect);
-
-			UIFilledRectangle returnToLobbyBackgroundRect = new UIFilledRectangle(this.uiElementGap, this.uiElementGap, 0, rectWidth, this.cellSizePx + this.uiElementGap * 2, HUD_SCENE);
-			returnToLobbyBackgroundRect.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
-			returnToLobbyBackgroundRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
-			returnToLobbyBackgroundRect.setMaterial(this.lightGray);
-
-			Button returnToLobbyBtn = new Button(this.uiElementGap, this.uiElementGap, this.cellSizePx * 3, this.cellSizePx, "btn_return_to_lobby", "Return To Lobby", FontUtils.ggsans.deriveFont(Font.BOLD), 24, INPUT_SCENE);
-			returnToLobbyBtn.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
-			returnToLobbyBtn.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
-			returnToLobbyBtn.bind(returnToLobbyBackgroundRect);
 		}
 	}
 
@@ -710,14 +691,10 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void update() {
-		Input.inputsHovered(uiScreen.getEntityIDAtMouse());
+	public void _update() {
+		Input.inputsHovered(uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 
 		// -- NETWORKING --
-		if (this.client.getCurGame() == GameServer.LOBBY) {
-			this.sm.switchState(this.mainLobbyState);
-		}
-
 		if (this.client.scrabbleIsGameStarting()) {
 			this.removeAllMoveableTiles();
 			this.isInGame = true;
@@ -827,7 +804,7 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void render(Framebuffer outputBuffer) {
+	public void _render(Framebuffer outputBuffer) {
 		uiScreen.setUIScene(BACKGROUND_SCENE);
 		uiScreen.render(outputBuffer);
 
@@ -877,7 +854,7 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void mousePressed(int button) {
+	public void _mousePressed(int button) {
 		Input.inputsPressed(uiScreen.getEntityIDAtMouse());
 
 		if (!this.tileHeld) {
@@ -890,8 +867,8 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void mouseReleased(int button) {
-		Input.inputsReleased(uiScreen.getEntityIDAtMouse());
+	public void _mouseReleased(int button) {
+		Input.inputsReleased(uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 		String clickedButton = Input.getClicked();
 		switch (clickedButton) {
 		case "btn_start_game": {
@@ -922,11 +899,6 @@ public class ScrabbleState extends State {
 			break;
 		}
 
-		case "btn_return_to_lobby": {
-			this.client.returnToMainLobby();
-			break;
-		}
-
 		case "btn_skip_move": {
 			this.client.scrabbleSkipMove();
 			break;
@@ -943,7 +915,12 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void keyPressed(int key) {
+	public void _mouseScrolled(float wheelOffset, float smoothOffset) {
+		// TODO Auto-generated method stub
+	}
+
+	@Override
+	public void _keyPressed(int key) {
 		if (this.isInGame && key == GLFW_KEY_C && this.client.scrabbleGetNextPlayer() == this.client.getID()) {
 			ArrayList<Character> hand = new ArrayList<>();
 			for (long id : this.tileRects.keySet()) {
@@ -963,7 +940,7 @@ public class ScrabbleState extends State {
 	}
 
 	@Override
-	public void keyReleased(int key) {
+	public void _keyReleased(int key) {
 
 	}
 
