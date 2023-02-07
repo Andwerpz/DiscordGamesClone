@@ -91,7 +91,7 @@ public class Text extends UIElement {
 		this.font = font;
 		this.fontSize = font.getSize();
 
-		this.textWidth = GraphicsTools.calculateTextWidth(text, font);
+		this.textWidth = GraphicsTools.calculateTextWidth(this.text, font);
 
 		this.textSampleAscent = GraphicsTools.getFontSampleAscent(font);
 		this.textSampleDescent = GraphicsTools.getFontSampleDescent(font);
@@ -101,7 +101,7 @@ public class Text extends UIElement {
 		this.width = width;
 		this.height = this.textMaxHeight;
 
-		BufferedImage img = GraphicsTools.generateTextImage(text, font, Color.WHITE, (int) this.width);
+		BufferedImage img = GraphicsTools.generateTextImage(this.text, this.font, Color.WHITE, (int) this.width);
 		Texture texture = new Texture(img, Texture.VERTICAL_FLIP_BIT);
 		this.textTextureMaterial = new TextureMaterial(texture);
 

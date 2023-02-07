@@ -119,14 +119,16 @@ public class GameServer extends Server {
 	public void writePacket(PacketSender packetSender, int clientID) {
 		// -- NORMAL SERVER STUFF --
 		if (this.disconnect.size() != 0) {
-			packetSender.writeSectionHeader("disconnect", this.disconnect.size());
+			packetSender.startSection("disconnect");
+			packetSender.write(this.disconnect.size());
 			for (int i : this.disconnect) {
 				packetSender.write(i);
 			}
 		}
 
 		if (this.connect.size() != 0) {
-			packetSender.writeSectionHeader("connect", this.connect.size());
+			packetSender.startSection("connect");
+			packetSender.write(this.connect.size());
 			for (int i : this.connect) {
 				packetSender.write(i);
 				packetSender.write(this.playerNicknames.get(i).length());
@@ -135,14 +137,16 @@ public class GameServer extends Server {
 		}
 
 		if (this.serverMessages.size() != 0) {
-			packetSender.writeSectionHeader("server_messages", this.serverMessages.size());
+			packetSender.startSection("server_messages");
+			packetSender.write(this.serverMessages.size());
 			for (String s : this.serverMessages) {
 				packetSender.write(s.length());
 				packetSender.write(s);
 			}
 		}
 
-		packetSender.writeSectionHeader("player_info", this.players.size());
+		packetSender.startSection("player_info");
+		packetSender.write(this.players.size());
 		for (int i : this.players) {
 			packetSender.write(i);
 			packetSender.write(this.playerNicknames.get(i).length());
@@ -150,15 +154,15 @@ public class GameServer extends Server {
 		}
 
 		if (this.startingGame) {
-			packetSender.writeSectionHeader("start_game", 1);
+			packetSender.startSection("start_game");
 			packetSender.write(this.curGame);
 		}
 
 		if (this.returnToMainLobby) {
-			packetSender.writeSectionHeader("return_to_main_lobby", 1);
+			packetSender.startSection("return_to_main_lobby");
 		}
 
-		packetSender.writeSectionHeader("host_id", 1);
+		packetSender.startSection("host_id");
 		packetSender.write(this.hostID);
 
 		// -- GAME SPECIFIC --
@@ -180,8 +184,8 @@ public class GameServer extends Server {
 
 	private void writePacketBlazingEights(PacketSender packetSender, int clientID) {
 		if (this.blazingEightsStartingGame) {
-			packetSender.writeSectionHeader("blazing_eights_start_game", this.players.size());
-
+			packetSender.startSection("blazing_eights_start_game");
+			packetSender.write(this.players.size());
 			for (int id : this.blazingEightsMoveOrder) {
 				packetSender.write(id);
 				packetSender.write(this.blazingEightsCardAmt.get(id));
@@ -189,8 +193,7 @@ public class GameServer extends Server {
 		}
 
 		if (this.blazingEightsMovePerformed) {
-			packetSender.writeSectionHeader("blazing_eights_move_performed", 1);
-
+			packetSender.startSection("blazing_eights_move_performed");
 			packetSender.write(this.blazingEightsMovePlayer);
 			packetSender.write(this.blazingEightsMoveType);
 			packetSender.write(this.blazingEightsMoveValue);
@@ -198,14 +201,13 @@ public class GameServer extends Server {
 		}
 
 		if (this.blazingEightsEndingGame) {
-			packetSender.writeSectionHeader("blazing_eights_end_game", 1);
+			packetSender.startSection("blazing_eights_end_game");
 		}
 	}
 
 	private void writePacketScrabble(PacketSender packetSender, int clientID) {
 		if (this.scrabbleStartingGame) {
-			packetSender.writeSectionHeader("scrabble_start_game", 1);
-
+			packetSender.startSection("scrabble_start_game");
 			this.scrabbleGame = new ScrabbleGame();
 
 			this.scrabblePlayerMoveOrder = new ArrayList<>();
@@ -225,13 +227,14 @@ public class GameServer extends Server {
 		}
 
 		if (this.scrabbleMovePerformed || this.scrabbleStartingGame) {
-			packetSender.writeSectionHeader("scrabble_next_player", 1);
+			packetSender.startSection("scrabble_next_player");
 			packetSender.write(this.scrabbleRoundsLeft);
 			packetSender.write(this.scrabblePlayerMoveOrder.get(this.scrabbleMoveIndex));
 		}
 
 		if (this.scrabbleMovePerformed || this.scrabbleStartingGame) {
-			packetSender.writeSectionHeader("scrabble_player_hand", this.scrabblePlayerHands.size());
+			packetSender.startSection("scrabble_player_hand");
+			packetSender.write(this.scrabblePlayerHands.size());
 			for (int i : this.scrabblePlayerHands.keySet()) {
 				packetSender.write(i);
 				for (char j : this.scrabblePlayerHands.get(i)) {
@@ -241,7 +244,8 @@ public class GameServer extends Server {
 		}
 
 		if (this.scrabbleMovePerformed) {
-			packetSender.writeSectionHeader("scrabble_make_move", this.scrabbleNextMove.size());
+			packetSender.startSection("scrabble_make_move");
+			packetSender.write(this.scrabbleNextMove.size());
 			for (Pair<int[], Character> i : this.scrabbleNextMove) {
 				packetSender.write(i.first);
 				packetSender.write(i.second);
@@ -249,7 +253,8 @@ public class GameServer extends Server {
 		}
 
 		if (this.scrabbleMovePerformed || this.scrabbleStartingGame) {
-			packetSender.writeSectionHeader("scrabble_player_scores", this.scrabblePlayerScores.size());
+			packetSender.startSection("scrabble_player_scores");
+			packetSender.write(this.scrabblePlayerScores.size());
 			for (int id : this.scrabblePlayerScores.keySet()) {
 				packetSender.write(id);
 				packetSender.write(this.scrabblePlayerScores.get(id));
@@ -257,7 +262,7 @@ public class GameServer extends Server {
 		}
 
 		if (this.scrabbleEndingGame) {
-			packetSender.writeSectionHeader("scrabble_end_game", 1);
+			packetSender.startSection("scrabble_end_game");
 		}
 	}
 
@@ -268,7 +273,8 @@ public class GameServer extends Server {
 		// - send who is spectating the game
 		// - TODO send current position so we can have a render on the select button
 		if (this.chessLobbyUpdates.size() != 0) {
-			packetSender.writeSectionHeader("chess_lobby_updates", this.chessLobbyUpdates.size());
+			packetSender.startSection("chess_lobby_updates");
+			packetSender.write(this.chessLobbyUpdates.size());
 			for (int i : this.chessLobbyUpdates.keySet()) {
 				int updateType = this.chessLobbyUpdates.get(i);
 				int chessGameID = i;
@@ -299,7 +305,8 @@ public class GameServer extends Server {
 		// - int[] from coordinate
 		// - int[] to coordinate
 		if (this.chessMoveUpdates.size() != 0) {
-			packetSender.writeSectionHeader("chess_move_updates", this.chessMoveUpdates.size());
+			packetSender.startSection("chess_move_updates");
+			packetSender.write(this.chessMoveUpdates.size());
 			for (int i : this.chessMoveUpdates.keySet()) {
 				int whichGame = i;
 				Pair<Integer, int[][]> next = this.chessMoveUpdates.get(i);
@@ -337,55 +344,50 @@ public class GameServer extends Server {
 	}
 
 	@Override
-	public void readPacket(PacketListener packetListener, int clientID) throws IOException {
-		while (packetListener.hasMoreBytes()) {
-			String sectionName = packetListener.readSectionHeader();
-			int elementAmt = packetListener.getSectionElementAmt();
-
-			switch (sectionName) {
-			case "set_nickname": {
-				int nickLength = packetListener.readInt();
-				String nickname = packetListener.readString(nickLength);
-				if (nickLength <= 100) {
-					this.serverMessages.add(this.playerNicknames.get(clientID) + " changed their name to " + nickname);
-					this.playerNicknames.put(clientID, nickname);
-				}
-				break;
+	public void readSection(PacketListener packetListener, int clientID) throws IOException {
+		switch (packetListener.getSectionName()) {
+		case "set_nickname": {
+			int nickLength = packetListener.readInt();
+			String nickname = packetListener.readString(nickLength);
+			if (nickLength <= 100) {
+				this.serverMessages.add(this.playerNicknames.get(clientID) + " changed their name to " + nickname);
+				this.playerNicknames.put(clientID, nickname);
 			}
+			break;
+		}
 
-			case "start_game": {
-				int whichGame = packetListener.readInt();
-				this.curGame = whichGame;
-				this.startingGame = true;
-				break;
-			}
+		case "start_game": {
+			int whichGame = packetListener.readInt();
+			this.curGame = whichGame;
+			this.startingGame = true;
+			break;
+		}
 
-			case "return_to_main_lobby": {
-				this.returnToMainLobby = true;
-				this.resetGameInfo();
-				break;
-			}
-			}
+		case "return_to_main_lobby": {
+			this.returnToMainLobby = true;
+			this.resetGameInfo();
+			break;
+		}
+		}
 
-			// -- GAME SPECIFIC --
-			switch (this.curGame) {
-			case CHESS:
-				this.readPacketChess(packetListener, clientID, sectionName, elementAmt);
-				break;
+		// -- GAME SPECIFIC --
+		switch (this.curGame) {
+		case CHESS:
+			this.readPacketChess(packetListener, clientID);
+			break;
 
-			case SCRABBLE:
-				this.readPacketScrabble(packetListener, clientID, sectionName, elementAmt);
-				break;
+		case SCRABBLE:
+			this.readPacketScrabble(packetListener, clientID);
+			break;
 
-			case BLAZING_EIGHTS:
-				this.readPacketBlazingEights(packetListener, clientID, sectionName, elementAmt);
-				break;
-			}
+		case BLAZING_EIGHTS:
+			this.readPacketBlazingEights(packetListener, clientID);
+			break;
 		}
 	}
 
-	public void readPacketBlazingEights(PacketListener packetListener, int clientID, String sectionName, int elementAmt) throws IOException {
-		switch (sectionName) {
+	public void readPacketBlazingEights(PacketListener packetListener, int clientID) throws IOException {
+		switch (packetListener.getSectionName()) {
 		case "blazing_eights_start_game": {
 			this.blazingEightsStartingGame = true;
 
@@ -468,8 +470,8 @@ public class GameServer extends Server {
 		}
 	}
 
-	public void readPacketScrabble(PacketListener packetListener, int clientID, String sectionName, int elementAmt) throws IOException {
-		switch (sectionName) {
+	public void readPacketScrabble(PacketListener packetListener, int clientID) throws IOException {
+		switch (packetListener.getSectionName()) {
 		case "scrabble_start_game": {
 			this.scrabbleRoundsLeft = packetListener.readInt();
 			this.scrabbleStartingGame = true;
@@ -483,6 +485,8 @@ public class GameServer extends Server {
 
 		case "scrabble_make_move": {
 			this.scrabbleNextMove.clear();
+
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int[] coords = packetListener.readNInts(2);
 				char letter = (char) packetListener.readInt();
@@ -543,8 +547,8 @@ public class GameServer extends Server {
 		}
 	}
 
-	public void readPacketChess(PacketListener packetListener, int clientID, String sectionName, int elementAmt) throws IOException {
-		switch (sectionName) {
+	public void readPacketChess(PacketListener packetListener, int clientID) throws IOException {
+		switch (packetListener.getSectionName()) {
 		case "chess_create_game": {
 			ChessGame newGame = new ChessGame();
 			newGame.setWhiteID(clientID);

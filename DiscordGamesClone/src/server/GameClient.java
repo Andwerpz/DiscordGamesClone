@@ -120,20 +120,20 @@ public class GameClient extends Client {
 	public void writePacket(PacketSender packetSender) {
 		// -- NORMAL CLIENT STUFF --
 		if (this.writeNickname) {
-			packetSender.writeSectionHeader("set_nickname", 1);
+			packetSender.startSection("set_nickname");
 			packetSender.write(this.nickname.length());
 			packetSender.write(this.nickname);
 			this.writeNickname = false;
 		}
 
 		if (this.startingGame) {
-			packetSender.writeSectionHeader("start_game", 1);
+			packetSender.startSection("start_game");
 			packetSender.write(this.curGame);
 			this.startingGame = false;
 		}
 
 		if (this.returnToMainLobby) {
-			packetSender.writeSectionHeader("return_to_main_lobby", 1);
+			packetSender.startSection("return_to_main_lobby");
 			this.returnToMainLobby = false;
 		}
 
@@ -155,12 +155,12 @@ public class GameClient extends Client {
 
 	private void writePacketBlazingEights(PacketSender packetSender) {
 		if (this.blazingEightsStartGame) {
-			packetSender.writeSectionHeader("blazing_eights_start_game", 1);
+			packetSender.startSection("blazing_eights_start_game");
 			this.blazingEightsStartGame = false;
 		}
 
 		if (this.blazingEightsPerformMove) {
-			packetSender.writeSectionHeader("blazing_eights_perform_move", 1);
+			packetSender.startSection("blazing_eights_perform_move");
 			packetSender.write(this.blazingEightsPerformMoveType);
 			packetSender.write(this.blazingEightsPerformMoveValue);
 			this.blazingEightsPerformMove = false;
@@ -169,7 +169,8 @@ public class GameClient extends Client {
 
 	private void writePacketScrabble(PacketSender packetSender) {
 		if (this.scrabbleOutgoingMove.size() != 0) {
-			packetSender.writeSectionHeader("scrabble_make_move", this.scrabbleOutgoingMove.size());
+			packetSender.startSection("scrabble_make_move");
+			packetSender.write(this.scrabbleOutgoingMove.size());
 			for (Pair<int[], Character> i : this.scrabbleOutgoingMove) {
 				packetSender.write(i.first);
 				packetSender.write(i.second);
@@ -178,37 +179,37 @@ public class GameClient extends Client {
 		}
 
 		if (this.scrabbleStartGame) {
-			packetSender.writeSectionHeader("scrabble_start_game", 1);
+			packetSender.startSection("scrabble_start_game");
 			packetSender.write(this.scrabbleStartGameRoundAmt);
 			this.scrabbleStartGameRoundAmt = 0;
 			this.scrabbleStartGame = false;
 		}
 
 		if (this.scrabbleSkipMove) {
-			packetSender.writeSectionHeader("scrabble_skip_move", 1);
+			packetSender.startSection("scrabble_skip_move");
 			this.scrabbleSkipMove = false;
 		}
 	}
 
 	private void writePacketChess(PacketSender packetSender) {
 		if (this.chessCreateGame) {
-			packetSender.writeSectionHeader("chess_create_game", 1);
+			packetSender.startSection("chess_create_game");
 			this.chessCreateGame = false;
 		}
 
 		if (this.chessJoinGame) {
-			packetSender.writeSectionHeader("chess_join_game", 1);
+			packetSender.startSection("chess_join_game");
 			packetSender.write(this.chessJoinWhichGame);
 			this.chessJoinGame = false;
 		}
 
 		if (this.chessLeaveGame) {
-			packetSender.writeSectionHeader("chess_leave_game", 1);
+			packetSender.startSection("chess_leave_game");
 			this.chessLeaveGame = false;
 		}
 
 		if (this.chessMakeMove) {
-			packetSender.writeSectionHeader("chess_make_move", 1);
+			packetSender.startSection("chess_make_move");
 			packetSender.write(this.chessCurGameID);
 			packetSender.write(this.ID);
 			packetSender.write(this.chessMoveFrom);
@@ -218,91 +219,91 @@ public class GameClient extends Client {
 	}
 
 	@Override
-	public void readPacket(PacketListener packetListener) throws IOException {
-		while (packetListener.hasMoreBytes()) {
-			String sectionName = packetListener.readSectionHeader();
-			int elementAmt = packetListener.getSectionElementAmt();
-
-			switch (sectionName) {
-			case "disconnect": {
-				for (int i = 0; i < elementAmt; i++) {
-					int playerID = packetListener.readInt();
-					this.removePlayer(playerID);
-				}
-				break;
+	public void readSection(PacketListener packetListener) throws IOException {
+		switch (packetListener.getSectionName()) {
+		case "disconnect": {
+			int elementAmt = packetListener.readInt();
+			for (int i = 0; i < elementAmt; i++) {
+				int playerID = packetListener.readInt();
+				this.removePlayer(playerID);
 			}
+			break;
+		}
 
-			case "connect": {
-				for (int i = 0; i < elementAmt; i++) {
-					int playerID = packetListener.readInt();
-					int nickLen = packetListener.readInt();
-					String nickname = packetListener.readString(nickLen);
-					this.addPlayer(playerID, nickname);
-				}
-				break;
+		case "connect": {
+			int elementAmt = packetListener.readInt();
+			for (int i = 0; i < elementAmt; i++) {
+				int playerID = packetListener.readInt();
+				int nickLen = packetListener.readInt();
+				String nickname = packetListener.readString(nickLen);
+				this.addPlayer(playerID, nickname);
 			}
+			break;
+		}
 
-			case "server_messages": {
-				for (int i = 0; i < elementAmt; i++) {
-					int sLength = packetListener.readInt();
-					String s = packetListener.readString(sLength);
-					this.serverMessages.add(s);
-				}
-				break;
+		case "server_messages": {
+			int elementAmt = packetListener.readInt();
+			for (int i = 0; i < elementAmt; i++) {
+				int sLength = packetListener.readInt();
+				String s = packetListener.readString(sLength);
+				this.serverMessages.add(s);
 			}
+			break;
+		}
 
-			case "player_info": {
-				for (int i = 0; i < elementAmt; i++) {
-					int playerID = packetListener.readInt();
-					int nickLen = packetListener.readInt();
-					String nickname = packetListener.readString(nickLen);
-					this.addPlayer(playerID, nickname);
-				}
-				break;
+		case "player_info": {
+			int elementAmt = packetListener.readInt();
+			for (int i = 0; i < elementAmt; i++) {
+				int playerID = packetListener.readInt();
+				int nickLen = packetListener.readInt();
+				String nickname = packetListener.readString(nickLen);
+				this.addPlayer(playerID, nickname);
 			}
+			break;
+		}
 
-			case "host_id": {
-				this.hostID = packetListener.readInt();
-				this.isHost = this.hostID == this.ID;
-				break;
-			}
+		case "host_id": {
+			this.hostID = packetListener.readInt();
+			this.isHost = this.hostID == this.ID;
+			break;
+		}
 
-			case "start_game": {
-				int whichGame = packetListener.readInt();
-				this.curGame = whichGame;
-				break;
-			}
+		case "start_game": {
+			int whichGame = packetListener.readInt();
+			this.curGame = whichGame;
+			break;
+		}
 
-			case "return_to_main_lobby": {
-				this.curGame = GameServer.LOBBY;
-				break;
-			}
-			}
+		case "return_to_main_lobby": {
+			this.curGame = GameServer.LOBBY;
+			break;
+		}
+		}
 
-			switch (this.curGame) {
-			case GameServer.CHESS:
-				this.readPacketChess(packetListener, sectionName, elementAmt);
-				break;
+		switch (this.curGame) {
+		case GameServer.CHESS:
+			this.readPacketChess(packetListener);
+			break;
 
-			case GameServer.SCRABBLE:
-				this.readPacketScrabble(packetListener, sectionName, elementAmt);
-				break;
+		case GameServer.SCRABBLE:
+			this.readPacketScrabble(packetListener);
+			break;
 
-			case GameServer.BLAZING_EIGHTS:
-				this.readPacketBlazingEights(packetListener, sectionName, elementAmt);
-				break;
-			}
+		case GameServer.BLAZING_EIGHTS:
+			this.readPacketBlazingEights(packetListener);
+			break;
 		}
 	}
 
-	private void readPacketBlazingEights(PacketListener packetListener, String sectionName, int elementAmt) throws IOException {
-		switch (sectionName) {
+	private void readPacketBlazingEights(PacketListener packetListener) throws IOException {
+		switch (packetListener.getSectionName()) {
 		case "blazing_eights_start_game": {
 			this.blazingEightsStartingGame = true;
 			this.blazingEightsMoveOrder = new ArrayList<>();
 			this.blazingEightsCardAmt = new HashMap<>();
 			this.blazingEightsMoveIndex = 0;
 
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int id = packetListener.readInt();
 				int cardAmt = packetListener.readInt();
@@ -340,8 +341,8 @@ public class GameClient extends Client {
 		}
 	}
 
-	private void readPacketScrabble(PacketListener packetListener, String sectionName, int elementAmt) throws IOException {
-		switch (sectionName) {
+	private void readPacketScrabble(PacketListener packetListener) throws IOException {
+		switch (packetListener.getSectionName()) {
 		case "scrabble_start_game": {
 			this.scrabbleGame = new ScrabbleGame();
 			this.scrabblePlayerScores.clear();
@@ -365,6 +366,7 @@ public class GameClient extends Client {
 		}
 
 		case "scrabble_make_move": {
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int[] coords = packetListener.readNInts(2);
 				char letter = (char) packetListener.readInt();
@@ -378,6 +380,7 @@ public class GameClient extends Client {
 		}
 
 		case "scrabble_player_scores": {
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int playerID = packetListener.readInt();
 				int score = packetListener.readInt();
@@ -387,6 +390,7 @@ public class GameClient extends Client {
 		}
 
 		case "scrabble_player_hand": {
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int playerID = packetListener.readInt();
 				ArrayList<Character> hand = new ArrayList<>();
@@ -400,10 +404,11 @@ public class GameClient extends Client {
 		}
 	}
 
-	private void readPacketChess(PacketListener packetListener, String sectionName, int elementAmt) throws IOException {
-		switch (sectionName) {
+	private void readPacketChess(PacketListener packetListener) throws IOException {
+		switch (packetListener.getSectionName()) {
 		case "chess_lobby_updates": {
 			this.chessHasLobbyUpdates = true;
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int updateType = packetListener.readInt();
 				int whichGame = packetListener.readInt();
@@ -457,6 +462,7 @@ public class GameClient extends Client {
 		}
 
 		case "chess_move_updates": {
+			int elementAmt = packetListener.readInt();
 			for (int i = 0; i < elementAmt; i++) {
 				int whichGame = packetListener.readInt();
 				int playerID = packetListener.readInt();
