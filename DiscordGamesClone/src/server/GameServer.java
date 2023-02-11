@@ -605,7 +605,7 @@ public class GameServer extends Server {
 			if (guess.equalsIgnoreCase(this.crackHeadsDrawPhaseWord)) {
 				int points = 100;
 				int numGuessed = this.crackHeadsMoveOrder.size() - this.crackHeadsHasNotGuessed.size();
-				points = Math.max(20, points - numGuessed * 25);
+				points = Math.max(20, points - numGuessed * 20);
 
 				//apply crack multiplier
 				switch (this.crackHeadsCrackLevel.get(clientID)) {

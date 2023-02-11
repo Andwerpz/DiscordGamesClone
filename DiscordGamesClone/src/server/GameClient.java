@@ -665,6 +665,10 @@ public class GameClient extends Client {
 		this.crackHeadsOutgoingLines.clear();
 	}
 
+	public HashMap<Integer, Integer> crackHeadsGetCrackLevels() {
+		return this.crackHeadsCrackLevels;
+	}
+
 	public void crackHeadsClearScreen() {
 		this.crackHeadsClearScreen = true;
 	}

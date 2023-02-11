@@ -136,6 +136,8 @@ public class CrackHeadsState extends GameState {
 
 	private FilledRectangle trashCanIcon;
 
+	private boolean guessedDrawPhaseWord = false;
+
 	public CrackHeadsState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
 
@@ -658,6 +660,7 @@ public class CrackHeadsState extends GameState {
 		}
 		this.isInDrawPhase = true;
 		this.isInPickPhase = false;
+		this.guessedDrawPhaseWord = false;
 		this.clearCanvas();
 
 		//apply crack effects
@@ -741,6 +744,8 @@ public class CrackHeadsState extends GameState {
 			String nick = this.client.getPlayers().get(id);
 			UIElement nextElement = null;
 
+			boolean guessedTheWord = guess.equalsIgnoreCase(this.client.crackHeadsGetDrawPhaseWord());
+
 			if (this.doGuessScrambling) {
 				char[] carr = guess.toCharArray();
 				int guarantee = carr.length / 4 + (carr.length % 4 == 0 ? 0 : 1);
@@ -756,7 +761,7 @@ public class CrackHeadsState extends GameState {
 				guess = new String(carr);
 			}
 
-			if (guess.equalsIgnoreCase(this.drawPhaseWord)) {
+			if (guessedTheWord) {
 				UIFilledRectangle greenRect = new UIFilledRectangle(10, 0, 0, 0, 30, HUD_BACKGROUND_SCENE);
 				greenRect.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_BOTTOM);
 				greenRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_BOTTOM);
@@ -764,6 +769,24 @@ public class CrackHeadsState extends GameState {
 				greenRect.setFillWidthMargin(10);
 				greenRect.setMaterial(new Material(new Vec3(17, 130, 59).mul(1.0f / 255.0f)));
 				greenRect.bind(this.guessFrame);
+
+				//different colors for different levels of crack
+				switch (this.client.crackHeadsGetCrackLevels().get(id)) {
+				case 1: {
+					greenRect.setMaterial(new Material(new Vec3(255, 193, 0).mul(1.0f / 255.0f)));
+					break;
+				}
+
+				case 2: {
+					greenRect.setMaterial(new Material(new Vec3(255, 116, 0).mul(1.0f / 255.0f)));
+					break;
+				}
+
+				case 3: {
+					greenRect.setMaterial(new Material(new Vec3(255, 0, 0).mul(1.0f / 255.0f)));
+					break;
+				}
+				}
 
 				Text msg = new Text(10, 0, 0, this.guessFrameWidth - 40, nick + " guessed the word", FontUtils.ggsans.deriveFont(Font.BOLD), 16, Color.WHITE, HUD_TEXT_SCENE);
 				msg.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_CENTER_BOTTOM);
@@ -891,9 +914,15 @@ public class CrackHeadsState extends GameState {
 		if (this.client.crackHeadsIsDrawing()) {
 			return;
 		}
+		if (this.guessedDrawPhaseWord) {
+			return;
+		}
 		String guess = Input.getText("tf_guess");
 		if (guess.length() == 0) {
 			return;
+		}
+		if (guess.equalsIgnoreCase(this.client.crackHeadsGetDrawPhaseWord())) {
+			this.guessedDrawPhaseWord = true;
 		}
 		this.client.crackHeadsMakeGuess(guess);
 		TextField tf = (TextField) Input.getInput("tf_guess");
