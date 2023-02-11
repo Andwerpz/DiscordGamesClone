@@ -287,7 +287,7 @@ public class Vec2 {
 	}
 
 	/**
-	 * Rotates this vector by the given radians.
+	 * Rotates this vector in the counterclockwise direction by the given radians.
 	 */
 	public void rotate(float radians) {
 		float c = (float) StrictMath.cos(radians);

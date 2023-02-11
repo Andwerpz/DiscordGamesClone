@@ -11,6 +11,8 @@ import util.Vec4;
 
 public class Material {
 
+	public static Material transparent = new Material(new Vec4(0, 0, 0, 0));
+
 	private Vec4 diffuse; //RGBA
 	private Vec4 specular; //Reflection RGB, 
 

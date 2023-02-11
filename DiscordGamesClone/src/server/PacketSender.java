@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.util.ArrayList;
 
+import util.Vec2;
 import util.Vec3;
 
 public class PacketSender {
@@ -53,7 +54,6 @@ public class PacketSender {
 			return;
 		}
 
-		this.write(this.curSectionName.length(), this.packet);
 		this.write(this.curSectionName, this.packet);
 		this.write(this.curSection.size(), this.packet);
 		this.packet.addAll(this.curSection);
@@ -111,6 +111,15 @@ public class PacketSender {
 		this.write(a, this.curSection);
 	}
 
+	private void write(Vec2 a, ArrayList<Byte> packet) {
+		this.write(a.x, packet);
+		this.write(a.y, packet);
+	}
+
+	public void write(Vec2 a) {
+		this.write(a, this.curSection);
+	}
+
 	private void write(int a, ArrayList<Byte> packet) {
 		this.write((byte) (0xFF & (a >> 24)), packet);
 		this.write((byte) (0xFF & (a >> 16)), packet);
@@ -133,12 +142,17 @@ public class PacketSender {
 	}
 
 	private void write(String a, ArrayList<Byte> packet) {
+		this.write(a.length(), packet);
 		char[] arr = a.toCharArray();
 		for (char c : arr) {
 			this.write((byte) c, packet);
 		}
 	}
 
+	/**
+	 * Writes the length of the string, then writes the string.
+	 * @param a
+	 */
 	public void write(String a) {
 		this.write(a, this.curSection);
 	}

@@ -151,13 +151,13 @@ public class Text extends UIElement {
 				int lineWidth = GraphicsTools.calculateTextWidth(currentLine, font);
 				int alignedX = 0;
 				if (this.horizontalAlignContent == ALIGN_CENTER) {
-					alignedX = 0;
+					alignedX = (int) (this.width - lineWidth) / 2;
 				}
 				else if (this.horizontalAlignContent == ALIGN_LEFT) {
 					alignedX = 0;
 				}
 				else if (this.horizontalAlignContent == ALIGN_RIGHT) {
-					alignedX = (int) this.height - lineWidth;
+					alignedX = (int) this.width - lineWidth;
 				}
 
 				g.drawString(currentLine, alignedX, curY + this.textSampleAscent);
@@ -174,7 +174,7 @@ public class Text extends UIElement {
 		int lineWidth = GraphicsTools.calculateTextWidth(currentLine, font);
 		int alignedX = 0;
 		if (this.horizontalAlignContent == ALIGN_CENTER) {
-			alignedX = 0;
+			alignedX = (int) (this.width - lineWidth) / 2;
 		}
 		else if (this.horizontalAlignContent == ALIGN_LEFT) {
 			alignedX = 0;
@@ -224,6 +224,10 @@ public class Text extends UIElement {
 		this.height = this.calculateHeight();
 
 		this.align();
+	}
+
+	public int getTextWidth() {
+		return this.textWidth;
 	}
 
 	public void setTextWrapping(boolean b) {

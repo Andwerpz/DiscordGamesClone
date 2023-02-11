@@ -12,9 +12,13 @@ import game.ScrabbleGame;
 import graphics.Material;
 import model.Model;
 import state.BlazingEightsState;
+import state.CrackHeadsState;
 import util.Mat4;
 import util.MathUtils;
 import util.Pair;
+import util.Quad;
+import util.Triple;
+import util.Vec2;
 import util.Vec3;
 import util.Vec4;
 
@@ -39,11 +43,16 @@ public class GameServer extends Server {
 	public static final int CHESS = 1;
 	public static final int SCRABBLE = 2;
 	public static final int BLAZING_EIGHTS = 3;
+	public static final int CRACK_HEADS = 4;
 
 	private int curGame = LOBBY;
 
 	private boolean startingGame = false;
 	private boolean returnToMainLobby = false;
+
+	//when you start a game, this will just keep track of everyone that is actually inside the game. 
+	//this is so that the game doesn't break when someone new joins the lobby during a game. 
+	private HashSet<Integer> playersInGame;
 
 	// -- CHESS -- 
 	//first two players to join a chess lobby will be the players
@@ -88,6 +97,45 @@ public class GameServer extends Server {
 	private boolean blazingEightsMovePerformed = false;
 	private int blazingEightsMovePlayer, blazingEightsMoveValue, blazingEightsMoveType;
 
+	// -- CRACK HEADS --
+	//want to be able to send line drawing updates in the form Vec2 a, Vec2 b, float size
+	private ArrayList<Quad<Vec2, Vec2, Float, Integer>> crackHeadsDrawnLines;
+
+	private boolean crackHeadsStartingGame = false;
+	private boolean crackHeadsEndingGame = false;
+
+	private HashMap<Integer, Integer> crackHeadsPoints;
+	private boolean crackHeadsUpdatePoints = false; //if true, will send point information next update
+
+	//will wait for everyone to pick
+	private boolean crackHeadsStartingPickPhase = false; //pick the word to draw / crack level
+	private HashSet<Integer> crackHeadsHasNotPicked;
+
+	//will go for 60 seconds
+	private boolean crackHeadsStartingDrawPhase = false; //drawing / guessing
+	private String crackHeadsDrawPhaseWord = null;
+	private HashSet<Integer> crackHeadsHasNotGuessed; //has not guessed correctly
+	private int crackHeadsDrawPhaseTotalPoints = 0;
+
+	private boolean crackHeadsIsInDrawPhase = false;
+	private long crackHeadsDrawPhaseDurationMillis = 60 * 1000;
+	private long crackHeadsDrawPhaseEndMillis = 0;
+	private long crackHeadsLastHintMillis = 0;
+
+	private boolean crackHeadsGiveHint = false;
+	private int crackHeadsHintIndex = 0;
+	private int crackHeadsNumHints = 0;
+
+	private ArrayList<Pair<Integer, String>> crackHeadsGuesses; //clientID, word guess
+
+	private ArrayList<Integer> crackHeadsMoveOrder;
+	private int crackHeadsMoveIndex = 0;
+	private int crackHeadsMovesLeft = 0;
+
+	private boolean crackHeadsClearScreen = false;
+
+	private HashMap<Integer, Integer> crackHeadsCrackLevel;
+
 	public GameServer(String ip, int port) {
 		super(ip, port);
 
@@ -99,6 +147,8 @@ public class GameServer extends Server {
 
 		this.serverMessages = new ArrayList<>();
 
+		this.playersInGame = new HashSet<>();
+
 		this.playerToChessGames = new HashMap<>();
 		this.chessGames = new HashMap<>();
 		this.chessLobbyUpdates = new HashMap<>();
@@ -108,11 +158,31 @@ public class GameServer extends Server {
 		this.scrabblePlayerMoveOrder = new ArrayList<>();
 		this.scrabblePlayerScores = new HashMap<>();
 		this.scrabblePlayerHands = new HashMap<>();
+
+		this.crackHeadsDrawnLines = new ArrayList<>();
+		this.crackHeadsGuesses = new ArrayList<>();
 	}
 
 	@Override
 	public void _update() {
-
+		switch (this.curGame) {
+		case CRACK_HEADS: {
+			if (this.crackHeadsIsInDrawPhase) {
+				int maxHints = this.crackHeadsDrawPhaseWord.length() / 2;
+				long hintWaitDuration = 10 * 1000;
+				if (System.currentTimeMillis() - crackHeadsLastHintMillis > hintWaitDuration && this.crackHeadsNumHints <= maxHints) {
+					this.crackHeadsGiveHint = true;
+					this.crackHeadsHintIndex = (int) (Math.random() * this.crackHeadsDrawPhaseWord.length());
+					this.crackHeadsLastHintMillis = System.currentTimeMillis();
+					this.crackHeadsNumHints++;
+				}
+				if (System.currentTimeMillis() > this.crackHeadsDrawPhaseEndMillis) {
+					this.crackHeadsEndMove();
+				}
+			}
+			break;
+		}
+		}
 	}
 
 	@Override
@@ -131,7 +201,6 @@ public class GameServer extends Server {
 			packetSender.write(this.connect.size());
 			for (int i : this.connect) {
 				packetSender.write(i);
-				packetSender.write(this.playerNicknames.get(i).length());
 				packetSender.write(this.playerNicknames.get(i));
 			}
 		}
@@ -140,7 +209,6 @@ public class GameServer extends Server {
 			packetSender.startSection("server_messages");
 			packetSender.write(this.serverMessages.size());
 			for (String s : this.serverMessages) {
-				packetSender.write(s.length());
 				packetSender.write(s);
 			}
 		}
@@ -149,13 +217,14 @@ public class GameServer extends Server {
 		packetSender.write(this.players.size());
 		for (int i : this.players) {
 			packetSender.write(i);
-			packetSender.write(this.playerNicknames.get(i).length());
 			packetSender.write(this.playerNicknames.get(i));
 		}
 
 		if (this.startingGame) {
 			packetSender.startSection("start_game");
 			packetSender.write(this.curGame);
+
+			this.playersInGame.add(clientID);
 		}
 
 		if (this.returnToMainLobby) {
@@ -178,8 +247,88 @@ public class GameServer extends Server {
 		case BLAZING_EIGHTS:
 			this.writePacketBlazingEights(packetSender, clientID);
 			break;
+
+		case CRACK_HEADS:
+			this.writePacketCrackHeads(packetSender, clientID);
+			break;
 		}
 
+	}
+
+	private void writePacketCrackHeads(PacketSender packetSender, int clientID) {
+		if (this.crackHeadsDrawnLines.size() != 0) {
+			packetSender.startSection("crack_heads_draw_line");
+			packetSender.write(this.crackHeadsDrawnLines.size());
+			for (Quad<Vec2, Vec2, Float, Integer> i : this.crackHeadsDrawnLines) {
+				packetSender.write(i.first);
+				packetSender.write(i.second);
+				packetSender.write(i.third);
+				packetSender.write(i.fourth);
+			}
+		}
+
+		if (this.crackHeadsStartingGame) {
+			packetSender.startSection("crack_heads_start_game");
+		}
+
+		if (this.crackHeadsEndingGame) {
+			packetSender.startSection("crack_heads_end_game");
+		}
+
+		if (this.crackHeadsGuesses.size() != 0) {
+			packetSender.startSection("crack_heads_guess");
+			packetSender.write(this.crackHeadsGuesses.size());
+			for (Pair<Integer, String> i : this.crackHeadsGuesses) {
+				packetSender.write(i.first);
+				packetSender.write(i.second);
+			}
+		}
+
+		if (this.crackHeadsUpdatePoints) {
+			packetSender.startSection("crack_heads_points");
+			packetSender.write(this.crackHeadsPoints.size());
+			for (int id : this.crackHeadsPoints.keySet()) {
+				packetSender.write(id);
+				packetSender.write(this.crackHeadsPoints.get(id));
+			}
+		}
+
+		//sends id of client that is picking the word, and the three words they need to pick from
+		if (this.crackHeadsStartingPickPhase) {
+			packetSender.startSection("crack_heads_pick_phase");
+
+			//send which client
+			packetSender.write(this.crackHeadsMoveOrder.get(this.crackHeadsMoveIndex));
+
+			//send words to pick from
+			packetSender.write(3);
+			packetSender.write(CrackHeadsState.getRandomWord());
+			packetSender.write(CrackHeadsState.getRandomWord());
+			packetSender.write(CrackHeadsState.getRandomWord());
+		}
+
+		//sends the id of the client that is drawing, and the word that they are drawing. 
+		//also, send everyone's crack level. 
+		if (this.crackHeadsStartingDrawPhase) {
+			packetSender.startSection("crack_heads_draw_phase");
+			packetSender.write(this.crackHeadsMoveOrder.get(this.crackHeadsMoveIndex));
+			packetSender.write(this.crackHeadsDrawPhaseWord);
+
+			packetSender.write(this.crackHeadsCrackLevel.size());
+			for (int id : this.crackHeadsCrackLevel.keySet()) {
+				packetSender.write(id);
+				packetSender.write(this.crackHeadsCrackLevel.get(id));
+			}
+		}
+
+		if (this.crackHeadsGiveHint) {
+			packetSender.startSection("crack_heads_hint");
+			packetSender.write(this.crackHeadsHintIndex);
+		}
+
+		if (this.crackHeadsClearScreen) {
+			packetSender.startSection("crack_heads_clear_screen");
+		}
 	}
 
 	private void writePacketBlazingEights(PacketSender packetSender, int clientID) {
@@ -213,7 +362,7 @@ public class GameServer extends Server {
 			this.scrabblePlayerMoveOrder = new ArrayList<>();
 			this.scrabblePlayerScores.clear();
 			this.scrabblePlayerHands.clear();
-			for (int i : this.players) {
+			for (int i : this.playersInGame) {
 				this.scrabblePlayerMoveOrder.add(i);
 				this.scrabblePlayerScores.put(i, 0);
 
@@ -341,15 +490,24 @@ public class GameServer extends Server {
 		this.blazingEightsStartingGame = false;
 		this.blazingEightsEndingGame = false;
 		this.blazingEightsMovePerformed = false;
+
+		this.crackHeadsDrawnLines.clear();
+		this.crackHeadsGuesses.clear();
+		this.crackHeadsStartingGame = false;
+		this.crackHeadsEndingGame = false;
+		this.crackHeadsStartingPickPhase = false;
+		this.crackHeadsStartingDrawPhase = false;
+		this.crackHeadsUpdatePoints = false;
+		this.crackHeadsGiveHint = false;
+		this.crackHeadsClearScreen = false;
 	}
 
 	@Override
 	public void readSection(PacketListener packetListener, int clientID) throws IOException {
 		switch (packetListener.getSectionName()) {
 		case "set_nickname": {
-			int nickLength = packetListener.readInt();
-			String nickname = packetListener.readString(nickLength);
-			if (nickLength <= 100) {
+			String nickname = packetListener.readString();
+			if (nickname.length() <= 100) {
 				this.serverMessages.add(this.playerNicknames.get(clientID) + " changed their name to " + nickname);
 				this.playerNicknames.put(clientID, nickname);
 			}
@@ -360,6 +518,7 @@ public class GameServer extends Server {
 			int whichGame = packetListener.readInt();
 			this.curGame = whichGame;
 			this.startingGame = true;
+			this.playersInGame = new HashSet<>();
 			break;
 		}
 
@@ -383,6 +542,98 @@ public class GameServer extends Server {
 		case BLAZING_EIGHTS:
 			this.readPacketBlazingEights(packetListener, clientID);
 			break;
+
+		case CRACK_HEADS:
+			this.readPacketCrackHeads(packetListener, clientID);
+			break;
+		}
+	}
+
+	public void readPacketCrackHeads(PacketListener packetListener, int clientID) throws IOException {
+		switch (packetListener.getSectionName()) {
+		case "crack_heads_draw_line": {
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				Vec2 a = packetListener.readVec2();
+				Vec2 b = packetListener.readVec2();
+				float size = packetListener.readFloat();
+				int colorIndex = packetListener.readInt();
+				this.crackHeadsDrawnLines.add(new Quad<Vec2, Vec2, Float, Integer>(a, b, size, colorIndex));
+			}
+			break;
+		}
+
+		case "crack_heads_clear_screen": {
+			this.crackHeadsClearScreen = true;
+			break;
+		}
+
+		case "crack_heads_start_game": {
+			this.crackHeadsStartingGame = true;
+			this.crackHeadsUpdatePoints = true;
+			this.crackHeadsMoveOrder = new ArrayList<Integer>();
+			this.crackHeadsPoints = new HashMap<Integer, Integer>();
+			this.crackHeadsMoveIndex = 0;
+			for (int id : this.playersInGame) {
+				this.crackHeadsMoveOrder.add(id);
+				this.crackHeadsPoints.put(id, 0);
+			}
+
+			this.crackHeadsMovesLeft = this.players.size() * 2;
+			this.crackHeadsStartPickPhase();
+			break;
+		}
+
+		case "crack_heads_pick": {
+			if (clientID == this.crackHeadsMoveOrder.get(this.crackHeadsMoveIndex)) {
+				//read in picked word
+				this.crackHeadsDrawPhaseWord = packetListener.readString();
+			}
+			else {
+				int level = packetListener.readInt();
+				this.crackHeadsCrackLevel.put(clientID, level);
+			}
+			this.crackHeadsHasNotPicked.remove(clientID);
+			if (this.crackHeadsHasNotPicked.size() == 0) {
+				this.crackHeadsStartDrawPhase();
+			}
+			break;
+		}
+
+		case "crack_heads_guess": {
+			String guess = packetListener.readString();
+			if (guess.equalsIgnoreCase(this.crackHeadsDrawPhaseWord)) {
+				int points = 100;
+				int numGuessed = this.crackHeadsMoveOrder.size() - this.crackHeadsHasNotGuessed.size();
+				points = Math.max(20, points - numGuessed * 25);
+
+				//apply crack multiplier
+				switch (this.crackHeadsCrackLevel.get(clientID)) {
+				case 1:
+					points *= 1.25;
+					break;
+
+				case 2:
+					points *= 1.5;
+					break;
+
+				case 3:
+					points *= 2;
+					break;
+				}
+
+				this.crackHeadsDrawPhaseTotalPoints += points;
+
+				this.crackHeadsPoints.put(clientID, this.crackHeadsPoints.get(clientID) + points);
+				this.crackHeadsUpdatePoints = true;
+				this.crackHeadsHasNotGuessed.remove(clientID);
+			}
+			if (this.crackHeadsHasNotGuessed.size() == 1) { //since the drawer cannot guess
+				this.crackHeadsEndMove();
+			}
+			this.crackHeadsGuesses.add(new Pair<Integer, String>(clientID, guess));
+			break;
+		}
 		}
 	}
 
@@ -397,7 +648,7 @@ public class GameServer extends Server {
 
 			this.blazingEightsCardAmt = new HashMap<>();
 			this.blazingEightsMoveOrder = new ArrayList<>();
-			for (int id : this.players) {
+			for (int id : this.playersInGame) {
 				this.blazingEightsMoveOrder.add(id);
 				this.blazingEightsCardAmt.put(id, 7);
 			}
@@ -617,9 +868,56 @@ public class GameServer extends Server {
 		this.resetChessGameInfo();
 		this.resetScrabbleGameInfo();
 		this.resetBlazingEightsGameInfo();
+		this.resetCrackHeadsGameInfo();
 	}
 
-	public void resetBlazingEightsGameInfo() {
+	private void resetCrackHeadsGameInfo() {
+		this.crackHeadsCrackLevel = null;
+		this.crackHeadsDrawnLines.clear();
+		this.crackHeadsGuesses.clear();
+		this.crackHeadsMoveOrder = null;
+	}
+
+	private void crackHeadsEndMove() {
+		int prevDrawer = this.crackHeadsMoveOrder.get(this.crackHeadsMoveIndex);
+		this.crackHeadsPoints.put(prevDrawer, this.crackHeadsDrawPhaseTotalPoints / 3);
+		this.crackHeadsUpdatePoints = true;
+
+		this.crackHeadsMoveIndex = (this.crackHeadsMoveIndex + 1) % this.crackHeadsMoveOrder.size();
+		this.crackHeadsMovesLeft--;
+		if (this.crackHeadsMovesLeft == 0) {
+			this.crackHeadsEndingGame = true;
+		}
+		else {
+			this.crackHeadsStartPickPhase();
+		}
+		this.crackHeadsIsInDrawPhase = false;
+		this.crackHeadsDrawPhaseEndMillis = 0;
+	}
+
+	private void crackHeadsStartPickPhase() {
+		this.crackHeadsStartingPickPhase = true;
+		this.crackHeadsHasNotPicked = new HashSet<Integer>();
+		this.crackHeadsCrackLevel = new HashMap<Integer, Integer>();
+		for (int id : this.crackHeadsMoveOrder) {
+			this.crackHeadsHasNotPicked.add(id);
+			this.crackHeadsCrackLevel.put(id, 0);
+		}
+	}
+
+	private void crackHeadsStartDrawPhase() {
+		this.crackHeadsNumHints = 0;
+		this.crackHeadsDrawPhaseTotalPoints = 0;
+		this.crackHeadsStartingDrawPhase = true;
+		this.crackHeadsHasNotGuessed = new HashSet<Integer>();
+		for (int id : this.crackHeadsMoveOrder) {
+			this.crackHeadsHasNotGuessed.add(id);
+		}
+		this.crackHeadsDrawPhaseEndMillis = System.currentTimeMillis() + this.crackHeadsDrawPhaseDurationMillis;
+		this.crackHeadsIsInDrawPhase = true;
+	}
+
+	private void resetBlazingEightsGameInfo() {
 		this.blazingEightsCardAmt = null;
 		this.blazingEightsMoveOrder = null;
 		this.blazingEightsStartingGame = false;

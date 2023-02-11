@@ -240,7 +240,7 @@ public class LobbyState extends State {
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/chess_with_mr_beast.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/letter_league_v1.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/blazing_eights.png", Texture.VERTICAL_FLIP_BIT)));
-		this.backgroundTextures.add(new TextureMaterial(new Texture("/astolfo.png", Texture.VERTICAL_FLIP_BIT)));
+		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/crack_heads_final.png", Texture.VERTICAL_FLIP_BIT)));
 
 		// -- UI BACKGROUND --
 		this.clearScene(BACKGROUND_UI_SCENE);
@@ -451,6 +451,11 @@ public class LobbyState extends State {
 
 			case GameServer.BLAZING_EIGHTS:
 				this.sm.switchState(new BlazingEightsState(this.sm, this.client, this));
+				break;
+
+			case GameServer.CRACK_HEADS:
+				this.sm.switchState(new CrackHeadsState(this.sm, this.client, this));
+				break;
 			}
 		}
 	}
@@ -539,6 +544,10 @@ public class LobbyState extends State {
 
 			case 3:
 				this.client.startGame(GameServer.BLAZING_EIGHTS);
+				break;
+
+			case 4:
+				this.client.startGame(GameServer.CRACK_HEADS);
 				break;
 			}
 			break;

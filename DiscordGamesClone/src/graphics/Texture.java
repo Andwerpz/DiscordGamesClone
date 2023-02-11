@@ -59,6 +59,14 @@ public class Texture {
 		this.textureID = this.load(path, loadOptions, minSampleType, magSampleType, 5);
 	}
 
+	public Texture(BufferedImage img, int loadOptions, int minSampleType, int magSampleType, int numMipmapLevels) {
+		this.textureID = this.load(img, loadOptions, minSampleType, magSampleType, numMipmapLevels);
+	}
+
+	public Texture(String path, int loadOptions, int minSampleType, int magSampleType, int numMipmapLevels) {
+		this.textureID = this.load(path, loadOptions, minSampleType, magSampleType, numMipmapLevels);
+	}
+
 	public Texture(int r, int g, int b, float a) {
 		BufferedImage img = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB);
 		int alpha = (int) MathUtils.clamp(0, 255, (int) (a * 255f));
@@ -71,14 +79,6 @@ public class Texture {
 		rgb |= (int) MathUtils.clamp(0, 255, b);
 		img.setRGB(0, 0, rgb);
 		this.textureID = this.load(img, 0, GL_LINEAR_MIPMAP_LINEAR, GL_LINEAR, 1);
-	}
-
-	public Texture(BufferedImage img, int loadOptions, int minSampleType, int magSampleType, int numMipmapLevels) {
-		this.textureID = this.load(img, loadOptions, minSampleType, magSampleType, numMipmapLevels);
-	}
-
-	public Texture(String path, int loadOptions, int minSampleType, int magSampleType, int numMipmapLevels) {
-		this.textureID = this.load(path, loadOptions, minSampleType, magSampleType, numMipmapLevels);
 	}
 
 	public Texture(int internalFormat, int width, int height, int dataFormat, int dataType) {

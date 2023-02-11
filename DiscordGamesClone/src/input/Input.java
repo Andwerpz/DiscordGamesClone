@@ -91,6 +91,10 @@ public abstract class Input extends UIElement {
 		return this.hovered;
 	}
 
+	public boolean isPressed() {
+		return this.pressed;
+	}
+
 	public boolean hasMouseEntered() {
 		return this.mouseEntered;
 	}
@@ -187,6 +191,10 @@ public abstract class Input extends UIElement {
 				((TextField) b).keyReleased(key);
 			}
 		}
+	}
+
+	public static HashMap<String, Input> getInputs() {
+		return inputs;
 	}
 
 }

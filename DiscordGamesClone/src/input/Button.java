@@ -76,6 +76,22 @@ public class Button extends Input {
 
 	}
 
+	public void setPressedMaterial(Material m) {
+		this.pressedMaterial = m;
+	}
+
+	public void setHoveredMaterial(Material m) {
+		this.hoveredMaterial = m;
+	}
+
+	public void setReleasedMaterial(Material m) {
+		this.releasedMaterial = m;
+	}
+
+	public void setText(String text) {
+		this.buttonText.setText(text);
+	}
+
 	@Override
 	protected void __update() {
 		Material nextMaterial = null;

@@ -7,6 +7,7 @@ import java.util.ArrayDeque;
 import java.util.Queue;
 
 import util.Pair;
+import util.Vec2;
 import util.Vec3;
 
 public class PacketListener implements Runnable {
@@ -124,6 +125,10 @@ public class PacketListener implements Runnable {
 		return new Vec3(this.readFloat(), this.readFloat(), this.readFloat());
 	}
 
+	public Vec2 readVec2() throws IOException {
+		return new Vec2(this.readFloat(), this.readFloat());
+	}
+
 	public char readChar() throws IOException {
 		return (char) this.readByte();
 	}
@@ -136,7 +141,14 @@ public class PacketListener implements Runnable {
 		return ans;
 	}
 
-	public String readString(int len) throws IOException {
+	/**
+	 * First reads an int, len, then reads a string of size len. 
+	 * @param len
+	 * @return
+	 * @throws IOException
+	 */
+	public String readString() throws IOException {
+		int len = this.readInt();
 		return new String(this.readNChars(len));
 	}
 

@@ -66,7 +66,7 @@ public abstract class GameState extends State {
 		this.pauseRect.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_TOP);
 		this.pauseRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 		this.pauseRect.setMaterial(new Material(new Vec4(0f, 0f, 0f, 0.3f)));
-		this.pauseRect.setEasingStyle(UIElement.EASE_OUT_BACK);
+		this.pauseRect.setEasingStyle(UIElement.EASE_OUT_QUAD);
 
 		if (!this.client.isHost()) {
 			Button mainMenuBtn = new Button(0, 0, 300, 50, "btn_return_to_main_menu", "Return to Main Menu", FontUtils.ggsans.deriveFont(Font.BOLD), 24, PAUSE_SCENE);
