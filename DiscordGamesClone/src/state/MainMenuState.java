@@ -58,7 +58,7 @@ public class MainMenuState extends State {
 
 	private UIFilledRectangle logoRect;
 
-	public static String versionNumber = "v0.3.1";
+	public static String versionNumber = "v0.3.2";
 
 	public MainMenuState(StateManager sm) {
 		super(sm);

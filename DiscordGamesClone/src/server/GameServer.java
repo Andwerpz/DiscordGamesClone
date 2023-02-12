@@ -118,7 +118,7 @@ public class GameServer extends Server {
 	private int crackHeadsDrawPhaseTotalPoints = 0;
 
 	private boolean crackHeadsIsInDrawPhase = false;
-	private long crackHeadsDrawPhaseDurationMillis = 60 * 1000;
+	private long crackHeadsDrawPhaseDurationMillis = 120 * 1000;
 	private long crackHeadsDrawPhaseEndMillis = 0;
 	private long crackHeadsLastHintMillis = 0;
 
@@ -170,7 +170,7 @@ public class GameServer extends Server {
 			if (this.crackHeadsIsInDrawPhase) {
 				int maxHints = this.crackHeadsDrawPhaseWord.length() / 2;
 				long hintWaitDuration = 10 * 1000;
-				if (System.currentTimeMillis() - crackHeadsLastHintMillis > hintWaitDuration && this.crackHeadsNumHints <= maxHints) {
+				if (System.currentTimeMillis() - crackHeadsLastHintMillis > hintWaitDuration && this.crackHeadsNumHints < maxHints) {
 					this.crackHeadsGiveHint = true;
 					this.crackHeadsHintIndex = (int) (Math.random() * this.crackHeadsDrawPhaseWord.length());
 					this.crackHeadsLastHintMillis = System.currentTimeMillis();
@@ -579,7 +579,7 @@ public class GameServer extends Server {
 				this.crackHeadsPoints.put(id, 0);
 			}
 
-			this.crackHeadsMovesLeft = this.players.size() * 2;
+			this.crackHeadsMovesLeft = this.playersInGame.size() * 2;
 			this.crackHeadsStartPickPhase();
 			break;
 		}
@@ -880,7 +880,7 @@ public class GameServer extends Server {
 
 	private void crackHeadsEndMove() {
 		int prevDrawer = this.crackHeadsMoveOrder.get(this.crackHeadsMoveIndex);
-		this.crackHeadsPoints.put(prevDrawer, this.crackHeadsDrawPhaseTotalPoints / 3);
+		this.crackHeadsPoints.put(prevDrawer, this.crackHeadsPoints.get(prevDrawer) + this.crackHeadsDrawPhaseTotalPoints / 3);
 		this.crackHeadsUpdatePoints = true;
 
 		this.crackHeadsMoveIndex = (this.crackHeadsMoveIndex + 1) % this.crackHeadsMoveOrder.size();

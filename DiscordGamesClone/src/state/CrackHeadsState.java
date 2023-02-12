@@ -138,6 +138,8 @@ public class CrackHeadsState extends GameState {
 
 	private boolean guessedDrawPhaseWord = false;
 
+	private boolean displayDrawPhaseWord = false;
+
 	public CrackHeadsState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
 
@@ -153,6 +155,7 @@ public class CrackHeadsState extends GameState {
 				String next = fin.readLine();
 				while (next != null) {
 					next = next.toUpperCase();
+					next = next.trim();
 					wordList.add(next);
 					next = fin.readLine();
 				}
@@ -504,7 +507,7 @@ public class CrackHeadsState extends GameState {
 		HashSet<Integer> hints = this.client.crackHeadsGetHints();
 		char[] carr = this.drawPhaseWord.toCharArray();
 		for (int i = 0; i < carr.length; i++) {
-			if (Character.isLetterOrDigit(carr[i]) && !this.client.crackHeadsIsDrawing() && !hints.contains(i)) {
+			if (Character.isLetterOrDigit(carr[i]) && !this.client.crackHeadsIsDrawing() && !hints.contains(i) && !this.displayDrawPhaseWord) {
 				carr[i] = '_';
 			}
 		}
@@ -645,11 +648,18 @@ public class CrackHeadsState extends GameState {
 		this.logo.easeYOffset(10);
 		this.isInPickPhase = false;
 		this.isInDrawPhase = false;
+		this.doCanvasHueShifting = false;
+		this.doColorSwapping = false;
+		this.doLineShifting = false;
+		this.doGuessScrambling = false;
+		this.doHintScrambling = false;
+		this.setCanvasHue(new Material(new Vec3(1)));
 	}
 
 	public void startDrawPhase() {
 		this.resetHUDOffsets();
 		this.clearGuesses();
+		this.displayDrawPhaseWord = false;
 		this.drawPhaseWord = this.client.crackHeadsGetDrawPhaseWord();
 		this.drawWordHintFrame();
 		this.wordHintFrame.easeYOffset(10);
@@ -697,6 +707,12 @@ public class CrackHeadsState extends GameState {
 
 	public void startPickPhase() {
 		this.resetHUDOffsets();
+		if (this.isInDrawPhase) {
+			this.displayDrawPhaseWord = true;
+			this.updateWordHint();
+			this.wordHintFrame.easeYOffset(10);
+		}
+
 		this.isInPickPhase = true;
 		this.isInDrawPhase = false;
 		this.scoreboardFrame.easeXOffset(10);
@@ -709,7 +725,6 @@ public class CrackHeadsState extends GameState {
 		}
 		this.colorSelectorFrame.easeYOffset(10);
 		this.setSelectedCrackLevel(0);
-		this.crackLevelSelectBtn.setText(this.selectedCrackLevel + "");
 		this.doCanvasHueShifting = false;
 		this.doColorSwapping = false;
 		this.doLineShifting = false;
