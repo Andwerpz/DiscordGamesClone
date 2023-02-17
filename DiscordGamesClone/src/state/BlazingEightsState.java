@@ -19,6 +19,8 @@ import java.util.Stack;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
+import client.ClientBlazingEightsInterface;
+import client.GameClient;
 import entity.Entity;
 import graphics.Framebuffer;
 import graphics.Material;
@@ -30,7 +32,6 @@ import main.Main;
 import model.FilledRectangle;
 import model.Model;
 import screen.UIScreen;
-import server.GameClient;
 import server.GameServer;
 import ui.Text;
 import ui.UIElement;
@@ -94,6 +95,8 @@ public class BlazingEightsState extends GameState {
 
 	public static final int CARD_AMT_LIMIT = 200;
 
+	private ClientBlazingEightsInterface gameInterface;
+
 	//we'll use these rects to generate the uifilled rectangles
 	//using only one rect for a given card lets us do instanced rendering 
 	private HashMap<Integer, FilledRectangle> cardFrontRects;
@@ -149,6 +152,7 @@ public class BlazingEightsState extends GameState {
 		super(sm, client, mainLobbyState);
 
 		this.startTime = System.currentTimeMillis();
+		this.gameInterface = (ClientBlazingEightsInterface) this.client.getGameInterface();
 	}
 
 	@Override
@@ -268,8 +272,8 @@ public class BlazingEightsState extends GameState {
 
 			this.opponentHUDYInterval = 72;
 
-			ArrayList<Integer> playerMoveOrder = this.client.blazingEightsGetMoveOrder();
-			HashMap<Integer, Integer> playerNumCards = this.client.blazingEightsGetCardAmt();
+			ArrayList<Integer> playerMoveOrder = this.gameInterface.blazingEightsGetMoveOrder();
+			HashMap<Integer, Integer> playerNumCards = this.gameInterface.blazingEightsGetCardAmt();
 
 			for (int i = 0; i < playerMoveOrder.size(); i++) {
 				int id = playerMoveOrder.get(i);
@@ -512,14 +516,14 @@ public class BlazingEightsState extends GameState {
 		Input.inputsHovered(uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 
 		// -- NETWORKING --
-		if (this.client.blazingEightsIsGameStarting()) {
+		if (this.gameInterface.blazingEightsIsGameStarting()) {
 			this.isInGame = true;
 			this.hasMoved = false;
 			this.removeAllCardsFromSet(this.handCards);
 			this.removeAllCardsFromSet(this.tableCards);
 			this.topCardType = -1;
 			this.cardsToOpponentRemaining = 0;
-			this.cardsToPlayerRemaining = this.client.blazingEightsGetCardAmt().get(this.client.getID());
+			this.cardsToPlayerRemaining = this.gameInterface.blazingEightsGetCardAmt().get(this.client.getID());
 			this.prevMoveWasDraw = false;
 
 			this.drawHUD();
@@ -533,7 +537,7 @@ public class BlazingEightsState extends GameState {
 			this.playerMoveIndicator.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
 			this.playerMoveIndicator.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_CENTER);
 
-			int nextPlayer = this.client.blazingEightsGetNextPlayer();
+			int nextPlayer = this.gameInterface.blazingEightsGetNextPlayer();
 			UIFilledRectangle nextPlayerRect = this.playerNameRects.get(nextPlayer);
 			float tx = nextPlayerRect.getLeftBorder() - 10;
 			float ty = nextPlayerRect.getCenter().y;
@@ -541,7 +545,7 @@ public class BlazingEightsState extends GameState {
 		}
 
 		if (this.isInGame) {
-			int[] nextMove = this.client.blazingEightsGetPerformedMove();
+			int[] nextMove = this.gameInterface.blazingEightsGetPerformedMove();
 			if (nextMove != null) {
 				this.hasMoved = false;
 				int movePlayer = nextMove[0];
@@ -576,13 +580,13 @@ public class BlazingEightsState extends GameState {
 
 		}
 
-		if (this.client.blazingEightsIsGameEnding()) {
+		if (this.gameInterface.blazingEightsIsGameEnding()) {
 			this.isInGame = false;
 			this.drawInputs();
 		}
 
 		if (this.playerMoveIndicator != null) {
-			int nextPlayer = this.client.blazingEightsGetNextPlayer();
+			int nextPlayer = this.gameInterface.blazingEightsGetNextPlayer();
 			UIFilledRectangle nextPlayerRect = this.playerNameRects.get(nextPlayer);
 			float tx = nextPlayerRect.getLeftBorder() - 10;
 			float ty = nextPlayerRect.getCenter().y;
@@ -802,15 +806,15 @@ public class BlazingEightsState extends GameState {
 			}
 		}
 		else {
-			if (this.client.blazingEightsIsMyTurn() && !this.hasMoved) {
+			if (this.gameInterface.blazingEightsIsMyTurn() && !this.hasMoved) {
 				if (this.hoveredCardID == this.deckCover.getID()) {
-					this.client.blazingEightsPerformMove(MOVE_DRAW, 1);
+					this.gameInterface.blazingEightsPerformMove(MOVE_DRAW, 1);
 					this.hasMoved = true;
 				}
 				else if (this.handCards.contains(this.hoveredCardID)) {
 					int cardType = this.cardTypes.get(this.hoveredCardID);
 					if (this.isValidMove(cardType)) {
-						this.client.blazingEightsPerformMove(MOVE_PLAY, cardType);
+						this.gameInterface.blazingEightsPerformMove(MOVE_PLAY, cardType);
 						this.playCardToTable(this.hoveredCardID);
 						this.hasMoved = true;
 					}
@@ -824,7 +828,7 @@ public class BlazingEightsState extends GameState {
 		Input.inputsReleased(this.uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 		switch (Input.getClicked()) {
 		case "btn_start_game": {
-			this.client.blazingEightsStartGame();
+			this.gameInterface.blazingEightsStartGame();
 			break;
 		}
 		}

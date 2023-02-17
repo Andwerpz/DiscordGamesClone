@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import audio.Sound;
+import client.GameClient;
 import entity.Entity;
 import graphics.Framebuffer;
 import graphics.Material;
@@ -28,7 +29,6 @@ import scene.Scene;
 import screen.PerspectiveScreen;
 import screen.Screen;
 import screen.UIScreen;
-import server.GameClient;
 import server.GameServer;
 import ui.Text;
 import ui.UIElement;

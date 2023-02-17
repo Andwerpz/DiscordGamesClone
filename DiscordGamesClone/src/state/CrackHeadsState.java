@@ -19,6 +19,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import client.ClientCrackHeadsInterface;
+import client.GameClient;
 import graphics.Framebuffer;
 import graphics.Material;
 import graphics.Texture;
@@ -31,7 +33,6 @@ import main.Main;
 import model.FilledRectangle;
 import model.Model;
 import screen.UIScreen;
-import server.GameClient;
 import ui.Text;
 import ui.UIElement;
 import ui.UIFilledRectangle;
@@ -62,6 +63,8 @@ public class CrackHeadsState extends GameState {
 	private static final int HUD_TEXT_SCENE = 4;
 
 	private static final int INPUT_SCENE = 5;
+
+	private ClientCrackHeadsInterface gameInterface;
 
 	private UIScreen uiScreen;
 
@@ -144,6 +147,7 @@ public class CrackHeadsState extends GameState {
 		super(sm, client, mainLobbyState);
 
 		this.startTimeMillis = System.currentTimeMillis();
+		this.gameInterface = (ClientCrackHeadsInterface) client.getGameInterface();
 	}
 
 	@Override
@@ -373,7 +377,7 @@ public class CrackHeadsState extends GameState {
 
 	private void updatePoints() {
 		//update points
-		HashMap<Integer, Integer> playerPoints = this.client.crackHeadsGetPoints();
+		HashMap<Integer, Integer> playerPoints = this.gameInterface.crackHeadsGetPoints();
 		for (int id : playerPoints.keySet()) {
 			Text pointText = this.scoreboardPointTexts.get(id);
 			pointText.setText(playerPoints.get(id) + "");
@@ -433,7 +437,7 @@ public class CrackHeadsState extends GameState {
 		this.wordSelectFrame.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 		this.wordSelectFrame.setMaterial(LobbyState.lightGray);
 
-		ArrayList<String> words = this.client.crackHeadsGetWordOptions();
+		ArrayList<String> words = this.gameInterface.crackHeadsGetWordOptions();
 		Button word1 = new Button(0, 10, 480, 40, "btn_word_select 0", words.get(0), FontUtils.ggsans.deriveFont(Font.BOLD), 24, INPUT_SCENE);
 		word1.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_TOP);
 		word1.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
@@ -474,10 +478,10 @@ public class CrackHeadsState extends GameState {
 		if (this.wordHintFrame != null) {
 			this.wordHintFrame.kill();
 		}
-		HashSet<Integer> hints = this.client.crackHeadsGetHints();
+		HashSet<Integer> hints = this.gameInterface.crackHeadsGetHints();
 		char[] carr = this.drawPhaseWord.toCharArray();
 		for (int i = 0; i < carr.length; i++) {
-			if (Character.isLetterOrDigit(carr[i]) && !this.client.crackHeadsIsDrawing() && !hints.contains(i)) {
+			if (Character.isLetterOrDigit(carr[i]) && !this.gameInterface.crackHeadsIsDrawing() && !hints.contains(i)) {
 				carr[i] = '_';
 			}
 		}
@@ -504,10 +508,10 @@ public class CrackHeadsState extends GameState {
 
 	//when new letters get revealed, show more chars. 
 	private void updateWordHint() {
-		HashSet<Integer> hints = this.client.crackHeadsGetHints();
+		HashSet<Integer> hints = this.gameInterface.crackHeadsGetHints();
 		char[] carr = this.drawPhaseWord.toCharArray();
 		for (int i = 0; i < carr.length; i++) {
-			if (Character.isLetterOrDigit(carr[i]) && !this.client.crackHeadsIsDrawing() && !hints.contains(i) && !this.displayDrawPhaseWord) {
+			if (Character.isLetterOrDigit(carr[i]) && !this.gameInterface.crackHeadsIsDrawing() && !hints.contains(i) && !this.displayDrawPhaseWord) {
 				carr[i] = '_';
 			}
 		}
@@ -660,12 +664,12 @@ public class CrackHeadsState extends GameState {
 		this.resetHUDOffsets();
 		this.clearGuesses();
 		this.displayDrawPhaseWord = false;
-		this.drawPhaseWord = this.client.crackHeadsGetDrawPhaseWord();
+		this.drawPhaseWord = this.gameInterface.crackHeadsGetDrawPhaseWord();
 		this.drawWordHintFrame();
 		this.wordHintFrame.easeYOffset(10);
 		this.guessFrame.easeXOffset(10);
 		this.scoreboardFrame.easeXOffset(10);
-		if (this.client.crackHeadsIsDrawing()) {
+		if (this.gameInterface.crackHeadsIsDrawing()) {
 			this.colorSelectorFrame.easeYOffset(10);
 		}
 		this.isInDrawPhase = true;
@@ -716,7 +720,7 @@ public class CrackHeadsState extends GameState {
 		this.isInPickPhase = true;
 		this.isInDrawPhase = false;
 		this.scoreboardFrame.easeXOffset(10);
-		if (this.client.crackHeadsIsPickingWord()) {
+		if (this.gameInterface.crackHeadsIsPickingWord()) {
 			this.drawWordSelectFrame();
 			this.wordSelectFrame.easeYOffset(0);
 		}
@@ -738,28 +742,28 @@ public class CrackHeadsState extends GameState {
 		Input.inputsHovered(this.selectedInputID, INPUT_SCENE);
 
 		// -- NETWORKING --
-		if (this.client.crackHeadsGameStarting()) {
+		if (this.gameInterface.crackHeadsGameStarting()) {
 			this.startGame();
 		}
-		if (this.client.crackHeadsGameEnding()) {
+		if (this.gameInterface.crackHeadsGameEnding()) {
 			this.endGame();
 		}
-		if (this.client.crackHeadsPickPhaseStarting()) {
+		if (this.gameInterface.crackHeadsPickPhaseStarting()) {
 			this.startPickPhase();
 		}
-		if (this.client.crackHeadsDrawPhaseStarting()) {
+		if (this.gameInterface.crackHeadsDrawPhaseStarting()) {
 			this.startDrawPhase();
 		}
 
 		//manage guesses
-		ArrayList<Pair<Integer, String>> guesses = this.client.crackHeadsGetIncomingGuesses();
+		ArrayList<Pair<Integer, String>> guesses = this.gameInterface.crackHeadsGetIncomingGuesses();
 		for (Pair<Integer, String> i : guesses) {
 			int id = i.first;
 			String guess = i.second;
 			String nick = this.client.getPlayers().get(id);
 			UIElement nextElement = null;
 
-			boolean guessedTheWord = guess.equalsIgnoreCase(this.client.crackHeadsGetDrawPhaseWord());
+			boolean guessedTheWord = guess.equalsIgnoreCase(this.gameInterface.crackHeadsGetDrawPhaseWord());
 
 			if (this.doGuessScrambling) {
 				char[] carr = guess.toCharArray();
@@ -786,7 +790,7 @@ public class CrackHeadsState extends GameState {
 				greenRect.bind(this.guessFrame);
 
 				//different colors for different levels of crack
-				switch (this.client.crackHeadsGetCrackLevels().get(id)) {
+				switch (this.gameInterface.crackHeadsGetCrackLevels().get(id)) {
 				case 1: {
 					greenRect.setMaterial(new Material(new Vec3(255, 193, 0).mul(1.0f / 255.0f)));
 					break;
@@ -848,12 +852,12 @@ public class CrackHeadsState extends GameState {
 		}
 
 		if (this.isInDrawPhase) {
-			if (this.client.crackHeadsHasNewHint()) {
+			if (this.gameInterface.crackHeadsHasNewHint()) {
 				this.updateWordHint();
 			}
 		}
 
-		if (this.client.crackHeadsShouldClearScreen()) {
+		if (this.gameInterface.crackHeadsShouldClearScreen()) {
 			this.clearCanvas();
 		}
 
@@ -881,9 +885,9 @@ public class CrackHeadsState extends GameState {
 
 		Vec2 nextMousePos = MouseInput.getMousePos();
 		if (this.mousePressed) {
-			if (!this.isInDrawPhase || (this.isInDrawPhase && this.client.crackHeadsIsDrawing() && this.isInGame)) {
+			if (!this.isInDrawPhase || (this.isInDrawPhase && this.gameInterface.crackHeadsIsDrawing() && this.isInGame)) {
 				this.drawLine(this.mousePos, nextMousePos, this.brushSize, this.selectedColor);
-				this.client.crackHeadsDrawLine(this.mousePos, nextMousePos, this.brushSize, this.selectedColor);
+				this.gameInterface.crackHeadsDrawLine(this.mousePos, nextMousePos, this.brushSize, this.selectedColor);
 			}
 		}
 		this.mousePos = nextMousePos;
@@ -899,7 +903,7 @@ public class CrackHeadsState extends GameState {
 		}
 
 		//get lines from other players
-		ArrayList<Quad<Vec2, Vec2, Float, Integer>> incomingLines = this.client.crackHeadsGetIncomingLines();
+		ArrayList<Quad<Vec2, Vec2, Float, Integer>> incomingLines = this.gameInterface.crackHeadsGetIncomingLines();
 		for (Quad<Vec2, Vec2, Float, Integer> i : incomingLines) {
 			Vec2 a = i.first;
 			Vec2 b = i.second;
@@ -926,7 +930,7 @@ public class CrackHeadsState extends GameState {
 	}
 
 	private void makeGuess() {
-		if (this.client.crackHeadsIsDrawing()) {
+		if (this.gameInterface.crackHeadsIsDrawing()) {
 			return;
 		}
 		if (this.guessedDrawPhaseWord) {
@@ -936,10 +940,10 @@ public class CrackHeadsState extends GameState {
 		if (guess.length() == 0) {
 			return;
 		}
-		if (guess.equalsIgnoreCase(this.client.crackHeadsGetDrawPhaseWord())) {
+		if (guess.equalsIgnoreCase(this.gameInterface.crackHeadsGetDrawPhaseWord())) {
 			this.guessedDrawPhaseWord = true;
 		}
-		this.client.crackHeadsMakeGuess(guess);
+		this.gameInterface.crackHeadsMakeGuess(guess);
 		TextField tf = (TextField) Input.getInput("tf_guess");
 		tf.setText("");
 	}
@@ -1002,7 +1006,7 @@ public class CrackHeadsState extends GameState {
 		}
 
 		case "trash_select": {
-			this.client.crackHeadsClearScreen();
+			this.gameInterface.crackHeadsClearScreen();
 			break;
 		}
 
@@ -1012,14 +1016,14 @@ public class CrackHeadsState extends GameState {
 		}
 
 		case "crack_level_confirm_btn": {
-			this.client.crackHeadsPickCrackLevel(this.selectedCrackLevel);
+			this.gameInterface.crackHeadsPickCrackLevel(this.selectedCrackLevel);
 			this.crackLevelSelectFrame.easeYOffset(Main.windowHeight);
 			break;
 		}
 
 		case "btn_word_select": {
-			String word = this.client.crackHeadsGetWordOptions().get(Integer.parseInt(clicked[1]));
-			this.client.crackHeadsPickWord(word);
+			String word = this.gameInterface.crackHeadsGetWordOptions().get(Integer.parseInt(clicked[1]));
+			this.gameInterface.crackHeadsPickWord(word);
 			this.wordSelectFrame.easeYOffset(Main.windowHeight);
 			break;
 		}
@@ -1031,7 +1035,7 @@ public class CrackHeadsState extends GameState {
 
 		case "btn_start_game": {
 			if (this.client.isHost()) {
-				this.client.crackHeadsStartGame();
+				this.gameInterface.crackHeadsStartGame();
 			}
 			break;
 		}

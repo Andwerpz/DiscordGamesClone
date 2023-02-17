@@ -11,6 +11,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import audio.Sound;
+import client.ClientScrabbleInterface;
+import client.GameClient;
 import entity.Entity;
 import game.ScrabbleGame;
 import graphics.Framebuffer;
@@ -31,7 +33,6 @@ import scene.Scene;
 import screen.PerspectiveScreen;
 import screen.Screen;
 import screen.UIScreen;
-import server.GameClient;
 import server.GameServer;
 import ui.Text;
 import ui.UIElement;
@@ -75,6 +76,8 @@ public class ScrabbleState extends GameState {
 
 	private static final int HUD_SCENE = 13;
 	private static final int HUD_TEXT_SCENE = 14;
+
+	private ClientScrabbleInterface gameInterface;
 
 	private Material backgroundColor = new Material(new Vec3(247, 213, 173).mul(1.0f / 255.0f));
 	private Material boardBackgroundColor = new Material(new Vec3(255, 247, 227).mul(1.0f / 255.0f));
@@ -167,6 +170,8 @@ public class ScrabbleState extends GameState {
 
 	public ScrabbleState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
+
+		this.gameInterface = (ClientScrabbleInterface) this.client.getGameInterface();
 	}
 
 	@Override
@@ -337,7 +342,7 @@ public class ScrabbleState extends GameState {
 		moveIndicatorRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
 		moveIndicatorRect.setMaterial(this.gray);
 
-		int nextPlayer = this.client.scrabbleGetNextPlayer();
+		int nextPlayer = this.gameInterface.scrabbleGetNextPlayer();
 		String indicatorString = this.client.getPlayers().get(nextPlayer) + "'s Move";
 		if (nextPlayer == this.client.getID()) {
 			indicatorString = "Your Move";
@@ -379,7 +384,7 @@ public class ScrabbleState extends GameState {
 		roundIndicatorRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
 		roundIndicatorRect.setMaterial(this.lightGray);
 
-		Text roundIndicatorText = new Text(0, 0, this.client.scrabbleGetRoundsLeft() + " Rounds Left", FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, HUD_TEXT_SCENE);
+		Text roundIndicatorText = new Text(0, 0, this.gameInterface.scrabbleGetRoundsLeft() + " Rounds Left", FontUtils.ggsans.deriveFont(Font.BOLD), 24, Color.WHITE, HUD_TEXT_SCENE);
 		roundIndicatorText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_BOTTOM);
 		roundIndicatorText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 		roundIndicatorText.bind(roundIndicatorRect);
@@ -682,7 +687,7 @@ public class ScrabbleState extends GameState {
 	}
 
 	private int getCurMoveScore() {
-		ScrabbleGame game = this.client.scrabbleGetGame();
+		ScrabbleGame game = this.gameInterface.scrabbleGetGame();
 		return game.getMoveScore(this.getCurMove());
 	}
 
@@ -695,12 +700,12 @@ public class ScrabbleState extends GameState {
 		Input.inputsHovered(uiScreen.getEntityIDAtMouse(), INPUT_SCENE);
 
 		// -- NETWORKING --
-		if (this.client.scrabbleIsGameStarting()) {
+		if (this.gameInterface.scrabbleIsGameStarting()) {
 			this.removeAllMoveableTiles();
 			this.isInGame = true;
 
 			//retrieve player's hand
-			ArrayList<Character> hand = this.client.scrabbleGetPlayerHand(this.client.getID());
+			ArrayList<Character> hand = this.gameInterface.scrabbleGetPlayerHand(this.client.getID());
 			for (int i = 0; i < hand.size(); i++) {
 				this.placeTileOnCell(-1, i, hand.get(i), true);
 			}
@@ -715,21 +720,21 @@ public class ScrabbleState extends GameState {
 		}
 
 		if (this.isInGame) {
-			if (this.client.scrabbleIsMoveIncoming()) {
-				ArrayList<Pair<int[], Character>> nextMove = this.client.scrabbleGetIncomingMove();
+			if (this.gameInterface.scrabbleIsMoveIncoming()) {
+				ArrayList<Pair<int[], Character>> nextMove = this.gameInterface.scrabbleGetIncomingMove();
 				this.removeAllMoveableTiles();
 
 				//retrieve player's hand
-				ArrayList<Character> hand = this.client.scrabbleGetPlayerHand(this.client.getID());
+				ArrayList<Character> hand = this.gameInterface.scrabbleGetPlayerHand(this.client.getID());
 				for (int i = 0; i < hand.size(); i++) {
 					this.placeTileOnCell(-1, i, hand.get(i), true);
 				}
 
-				if (this.client.scrabbleIsIncomingMoveValid()) {
+				if (this.gameInterface.scrabbleIsIncomingMoveValid()) {
 					//place down move if valid
 					for (Pair<int[], Character> i : nextMove) {
 						UIFilledRectangle tileRect = this.placeTileOnCell(i.first[0], i.first[1], i.second, false);
-						int bonusID = this.client.scrabbleGetGame().getBonusBoard()[i.first[0]][i.first[1]];
+						int bonusID = this.gameInterface.scrabbleGetGame().getBonusBoard()[i.first[0]][i.first[1]];
 						switch (bonusID) {
 						case ScrabbleGame.BONUS_LETTER_DOUBLE:
 							tileRect.setMaterial(this.doubleLetterColor);
@@ -742,13 +747,13 @@ public class ScrabbleState extends GameState {
 					}
 				}
 
-				this.playerScores = this.client.scrabbleGetPlayerScores();
+				this.playerScores = this.gameInterface.scrabbleGetPlayerScores();
 
 				this.drawUI();
 			}
 		}
 
-		if (this.client.scrabbleIsGameEnding()) {
+		if (this.gameInterface.scrabbleIsGameEnding()) {
 			this.makeAllTilesMoveable();
 			this.isInGame = false;
 			this.drawUI();
@@ -875,15 +880,15 @@ public class ScrabbleState extends GameState {
 			if (this.isInGame) {
 				break;
 			}
-			this.client.scrabbleStartGame(this.numRounds); //TODO make this adjustable
+			this.gameInterface.scrabbleStartGame(this.numRounds);
 			break;
 		}
 
 		case "btn_make_move": {
-			if (this.getCurMove().size() == 0 || this.client.getID() != this.client.scrabbleGetNextPlayer()) {
+			if (this.getCurMove().size() == 0 || this.client.getID() != this.gameInterface.scrabbleGetNextPlayer()) {
 				break;
 			}
-			this.client.scrabbleMakeMove(this.getCurMove());
+			this.gameInterface.scrabbleMakeMove(this.getCurMove());
 			break;
 		}
 
@@ -900,7 +905,7 @@ public class ScrabbleState extends GameState {
 		}
 
 		case "btn_skip_move": {
-			this.client.scrabbleSkipMove();
+			this.gameInterface.scrabbleSkipMove();
 			break;
 		}
 		}
@@ -921,20 +926,20 @@ public class ScrabbleState extends GameState {
 
 	@Override
 	public void _keyPressed(int key) {
-		if (this.isInGame && key == GLFW_KEY_C && this.client.scrabbleGetNextPlayer() == this.client.getID()) {
+		if (this.isInGame && key == GLFW_KEY_C && this.gameInterface.scrabbleGetNextPlayer() == this.client.getID()) {
 			ArrayList<Character> hand = new ArrayList<>();
 			for (long id : this.tileRects.keySet()) {
 				if (this.tileIsMoveable.get(id)) {
 					hand.add(this.tileLetters.get(id));
 				}
 			}
-			ArrayList<Pair<int[], Character>> bestMove = this.client.scrabbleGetGame().generateBestMove(hand);
+			ArrayList<Pair<int[], Character>> bestMove = this.gameInterface.scrabbleGetGame().generateBestMove(hand);
 
 			if (bestMove == null) {
 				System.out.println("THERE IS NO MOVE");
 			}
 			else {
-				this.client.scrabbleMakeMove(bestMove);
+				this.gameInterface.scrabbleMakeMove(bestMove);
 			}
 		}
 	}

@@ -15,6 +15,7 @@ import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALCCapabilities;
 import org.lwjgl.openal.ALCapabilities;
 
+import client.Client;
 import graphics.Shader;
 import input.KeyboardInput;
 import input.MouseInput;
@@ -23,7 +24,6 @@ import model.AssetManager;
 import scene.Scene;
 import screen.Screen;
 import screen.ScreenQuad;
-import server.Client;
 import server.Server;
 import state.MainMenuState;
 import state.StateManager;

@@ -383,8 +383,6 @@ public class ScrabbleGame {
 			}
 		}
 
-		System.err.println("THIS IS A VALID MOVE OF SCORE : " + score);
-
 		return score;
 	}
 

@@ -1,4 +1,4 @@
-package server;
+package client;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -11,6 +11,9 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashSet;
+
+import server.PacketListener;
+import server.PacketSender;
 
 public abstract class Client implements Runnable {
 

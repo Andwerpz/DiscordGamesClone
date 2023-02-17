@@ -4,6 +4,8 @@ import static org.lwjgl.glfw.GLFW.GLFW_KEY_ESCAPE;
 
 import java.awt.Font;
 
+import client.ClientGameInterface;
+import client.GameClient;
 import entity.Entity;
 import graphics.Framebuffer;
 import graphics.Material;
@@ -11,7 +13,6 @@ import input.Button;
 import input.Input;
 import main.Main;
 import screen.UIScreen;
-import server.GameClient;
 import server.GameServer;
 import ui.UIElement;
 import ui.UIFilledRectangle;
@@ -67,6 +68,7 @@ public abstract class GameState extends State {
 		this.pauseRect.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
 		this.pauseRect.setMaterial(new Material(new Vec4(0f, 0f, 0f, 0.3f)));
 		this.pauseRect.setEasingStyle(UIElement.EASE_OUT_QUAD);
+		this.pauseRect.setEasingDurationMillis(300);
 
 		if (!this.client.isHost()) {
 			Button mainMenuBtn = new Button(0, 0, 300, 50, "btn_return_to_main_menu", "Return to Main Menu", FontUtils.ggsans.deriveFont(Font.BOLD), 24, PAUSE_SCENE);

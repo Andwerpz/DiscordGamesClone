@@ -9,6 +9,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 import audio.Sound;
+import client.ClientChessInterface;
+import client.GameClient;
 import entity.Entity;
 import game.ChessGame;
 import game.ChessPosition;
@@ -29,7 +31,6 @@ import scene.Light;
 import scene.Scene;
 import screen.PerspectiveScreen;
 import screen.UIScreen;
-import server.GameClient;
 import server.GameServer;
 import ui.Text;
 import ui.UIElement;
@@ -69,6 +70,8 @@ public class ChessState extends GameState {
 	private static final int BOARD_INFO_SCENE = 4; //move preview dots
 	private static final int WIN_INFO_SCENE = 5;
 	private static final int WIN_INFO_TEXT_SCENE = 6;
+
+	private ClientChessInterface gameInterface;
 
 	private UIScreen uiScreen; // Menu UI
 
@@ -155,6 +158,8 @@ public class ChessState extends GameState {
 
 	public ChessState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
+
+		this.gameInterface = (ClientChessInterface) this.client.getGameInterface();
 	}
 
 	@Override
@@ -227,8 +232,8 @@ public class ChessState extends GameState {
 		int gameButtonWidth = 300;
 		int gameButtonHeight = 150;
 
-		for (int i : this.client.getChessGames().keySet()) {
-			ChessGame game = this.client.getChessGames().get(i);
+		for (int i : this.gameInterface.getChessGames().keySet()) {
+			ChessGame game = this.gameInterface.getChessGames().get(i);
 			String whiteNickname = game.getWhiteID() == -1 ? "Empty Slot" : this.client.getPlayers().get(game.getWhiteID());
 			String blackNickname = game.getBlackID() == -1 ? "Empty Slot" : this.client.getPlayers().get(game.getBlackID());
 
@@ -369,7 +374,7 @@ public class ChessState extends GameState {
 		Text prevText = spectatorBoardTitle;
 		int spectatorTextLineSpacing = 10;
 
-		for (int id : this.client.chessGetCurGame().getSpectators()) {
+		for (int id : this.gameInterface.chessGetCurGame().getSpectators()) {
 			String spectatorNick = this.client.getPlayers().get(id);
 
 			Text spectatorText = new Text(10, prevText.getYOffset() + prevText.getHeight() + spectatorTextLineSpacing, spectatorNick, FontUtils.ggsans, 16, Color.WHITE, STATIC_UI_SCENE);
@@ -542,25 +547,25 @@ public class ChessState extends GameState {
 
 		// -- NETWORKING --
 		if (this.inLobby) {
-			if (this.client.chessGetCurGameID() != this.curChessGameID) { //server says that you're in a game
+			if (this.gameInterface.chessGetCurGameID() != this.curChessGameID) { //server says that you're in a game
 				this.inLobby = false;
-				this.curChessGame = this.client.chessGetCurGame();
-				this.curChessGameID = this.client.chessGetCurGameID();
+				this.curChessGame = this.gameInterface.chessGetCurGame();
+				this.curChessGameID = this.gameInterface.chessGetCurGameID();
 
-				if (this.client.chessIsSpectating()) {
+				if (this.gameInterface.chessIsSpectating()) {
 					this.chessIsSpectating = true;
 					this.isWhite = true;
 				}
 				else {
 					this.chessIsSpectating = false;
-					this.isWhite = this.client.chessGetCurGame().getWhiteID() == this.client.getID();
+					this.isWhite = this.gameInterface.chessGetCurGame().getWhiteID() == this.client.getID();
 				}
 
 				this.drawChessBoard();
 			}
 		}
 		else {
-			if (this.client.chessGetCurGameID() == -1) { //server says that you're in the lobby
+			if (this.gameInterface.chessGetCurGameID() == -1) { //server says that you're in the lobby
 				this.inLobby = true;
 				this.curChessGame = null;
 				this.curChessGameID = -1;
@@ -570,13 +575,13 @@ public class ChessState extends GameState {
 
 				this.drawLobby();
 			}
-			if (this.client.chessCurGameHasMoveUpdate()) {
+			if (this.gameInterface.chessCurGameHasMoveUpdate()) {
 				this.drawChessBoard();
 				this.drawBoardInfo();
 			}
 		}
 
-		if (this.client.chessHasLobbyUpdates()) {
+		if (this.gameInterface.chessHasLobbyUpdates()) {
 			if (this.inLobby) {
 				this.drawLobby();
 			}
@@ -689,12 +694,12 @@ public class ChessState extends GameState {
 		System.out.println(clickedButton);
 		switch (clickedButton.split(" ")[0]) {
 		case "btn_create_game": {
-			this.client.chessCreateGame();
+			this.gameInterface.chessCreateGame();
 			break;
 		}
 
 		case "btn_leave_game": {
-			this.client.chessLeaveGame();
+			this.gameInterface.chessLeaveGame();
 			this.curChessGameID = -1;
 			this.curChessGame = null;
 			this.inLobby = true;
@@ -704,7 +709,7 @@ public class ChessState extends GameState {
 
 		case "btn_join_game": {
 			int gameID = Integer.parseInt(clickedButton.split(" ")[1]);
-			this.client.chessJoinGame(gameID);
+			this.gameInterface.chessJoinGame(gameID);
 			break;
 		}
 		}
@@ -723,7 +728,7 @@ public class ChessState extends GameState {
 					}
 				}
 				if (to != null && this.curChessGame.getCurPosition().isLegalMove(from, to)) {
-					this.client.chessMakeMove(from, to);
+					this.gameInterface.chessMakeMove(from, to);
 					this.drawChessBoard();
 				}
 				else {
