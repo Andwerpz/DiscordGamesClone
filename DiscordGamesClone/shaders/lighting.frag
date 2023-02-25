@@ -155,7 +155,8 @@ void main()
    	 	//float backfaceBias = 0;
    	 	
    	 	//float bias = max(0.0003 * (1.0 - dot(normal, lightDir)), 0.0005);  
-   	 	float bias = 0.0001;
+   	 	float bias = (1.0 / textureSize(shadowMap, 0).x) * shadowMapNear;
+   	 	//float bias = 0.0001 * shadowMapNear;
    	 	
    	 	vec2 texelSize = 1.0 / textureSize(shadowMap, 0);
    	 	int pcfSampleN = 2;

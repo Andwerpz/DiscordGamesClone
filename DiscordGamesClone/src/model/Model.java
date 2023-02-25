@@ -190,9 +190,21 @@ public class Model {
 			}
 
 			AIVector3D.Buffer AIuvs = mesh.mTextureCoords(0);
-			for (int j = 0; j < AIuvs.limit(); j++) {
-				AIVector3D v = AIuvs.get(j);
-				uvs.get(matIndex).add(new Vec2(v.x(), v.y()));
+			if (AIuvs != null) {
+				for (int j = 0; j < Math.max(AIuvs.limit(), AIVertices.limit()); j++) {
+					Vec2 uv = new Vec2((float) Math.random(), (float) Math.random());
+					if (j < AIuvs.limit()) {
+						AIVector3D v = AIuvs.get(j);
+						uv.set(new Vec2(v.x(), v.y()));
+					}
+					uvs.get(matIndex).add(uv);
+				}
+			}
+			else {
+				//if uvs don't get written, just assign random uv vector
+				for (int j = 0; j < AIVertices.limit(); j++) {
+					uvs.get(matIndex).add(new Vec2((float) Math.random(), (float) Math.random()));
+				}
 			}
 
 			AIFace.Buffer AIFaces = mesh.mFaces();

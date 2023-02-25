@@ -241,6 +241,7 @@ public class LobbyState extends State {
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/letter_league_v1.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/blazing_eights.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/crack_heads_final.png", Texture.VERTICAL_FLIP_BIT)));
+		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/rocket_league.png", Texture.VERTICAL_FLIP_BIT)));
 
 		// -- UI BACKGROUND --
 		this.clearScene(BACKGROUND_UI_SCENE);
@@ -456,6 +457,10 @@ public class LobbyState extends State {
 			case GameServer.CRACK_HEADS:
 				this.sm.switchState(new CrackHeadsState(this.sm, this.client, this));
 				break;
+
+			case GameServer.ROCKET_LEAGUE:
+				this.sm.switchState(new RocketLeagueState(this.sm, this.client, this));
+				break;
 			}
 		}
 	}
@@ -548,6 +553,10 @@ public class LobbyState extends State {
 
 			case 4:
 				this.client.startGame(GameServer.CRACK_HEADS);
+				break;
+
+			case 5:
+				this.client.startGame(GameServer.ROCKET_LEAGUE);
 				break;
 			}
 			break;

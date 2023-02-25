@@ -40,6 +40,7 @@ public class GameServer extends Server {
 	public static final int SCRABBLE = 2;
 	public static final int BLAZING_EIGHTS = 3;
 	public static final int CRACK_HEADS = 4;
+	public static final int ROCKET_LEAGUE = 5;
 
 	private int curGame = LOBBY;
 
@@ -173,6 +174,10 @@ public class GameServer extends Server {
 
 			case CRACK_HEADS:
 				this.gameInterface = new ServerCrackHeadsInterface(this);
+				break;
+
+			case ROCKET_LEAGUE:
+				this.gameInterface = new ServerRocketLeagueInterface(this);
 				break;
 			}
 			break;

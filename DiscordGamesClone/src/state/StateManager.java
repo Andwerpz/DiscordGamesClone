@@ -10,7 +10,7 @@ import graphics.Texture;
 import input.Input;
 import main.Main;
 import model.Model;
-import player.Player;
+import player.PlayerInputController;
 import screen.ScreenQuad;
 import util.Vec3;
 

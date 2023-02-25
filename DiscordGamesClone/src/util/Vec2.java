@@ -53,6 +53,10 @@ public class Vec2 {
 		this.y = y;
 	}
 
+	public void set(double x, double y) {
+		set((float) x, (float) y);
+	}
+
 	public Vec2 set(Vec2 v) {
 		x = v.x;
 		y = v.y;
@@ -287,7 +291,7 @@ public class Vec2 {
 	}
 
 	/**
-	 * Rotates this vector in the counterclockwise direction by the given radians.
+	 * Rotates this vector by the given radians.
 	 */
 	public void rotate(float radians) {
 		float c = (float) StrictMath.cos(radians);

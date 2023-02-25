@@ -37,8 +37,8 @@ public class PerspectiveScreen extends Screen {
 	private int particle_scene;
 	private boolean renderParticles = false;
 
-	private static final int SHADOW_MAP_NR_CASCADES = 6;
-	private static float[] shadowCascades = new float[] { NEAR, 1, 3, 7, 15, 30, FAR };
+	private static float[] shadowCascades = new float[] { NEAR, 1, 3, 7, 15, 30, 50, 75, 100, FAR };
+	private static final int SHADOW_MAP_NR_CASCADES = shadowCascades.length - 1;
 
 	private float worldFOV;
 
@@ -298,6 +298,7 @@ public class PerspectiveScreen extends Screen {
 		// backfaces should also be able to cast shadows
 		glDisable(GL_CULL_FACE);
 
+		// TODO make shadows optional
 		// calculate lighting with each light seperately
 		ArrayList<Light> lights = Light.lights.get(this.world_scene);
 		for (int i = 0; i < lights.size(); i++) {

@@ -146,6 +146,10 @@ public class GameClient extends Client {
 			case GameServer.CRACK_HEADS:
 				this.gameInterface = new ClientCrackHeadsInterface(this);
 				break;
+
+			case GameServer.ROCKET_LEAGUE:
+				this.gameInterface = new ClientRocketLeagueInterface(this);
+				break;
 			}
 			break;
 		}
