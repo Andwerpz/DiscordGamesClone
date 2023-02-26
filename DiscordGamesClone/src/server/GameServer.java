@@ -112,8 +112,6 @@ public class GameServer extends Server {
 		if (this.startingGame) {
 			packetSender.startSection("start_game");
 			packetSender.write(this.curGame);
-
-			this.playersInGame.add(clientID);
 		}
 
 		if (this.returnToMainLobby) {
@@ -159,6 +157,7 @@ public class GameServer extends Server {
 			this.curGame = whichGame;
 			this.startingGame = true;
 			this.playersInGame = new HashSet<>();
+			this.playersInGame.addAll(this.players);
 			switch (this.curGame) {
 			case CHESS:
 				this.gameInterface = new ServerChessInterface(this);

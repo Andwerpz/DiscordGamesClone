@@ -8,10 +8,12 @@ import static org.lwjgl.opengl.GL30.*;
 
 import java.util.ArrayList;
 
+import entity.Entity;
 import graphics.Cubemap;
 import graphics.Framebuffer;
 import graphics.Shader;
 import graphics.Texture;
+import input.MouseInput;
 import main.Main;
 import model.Model;
 import player.Camera;
@@ -205,6 +207,11 @@ public class PerspectiveScreen extends Screen {
 
 	public void renderParticles(boolean b) {
 		this.renderParticles = b;
+	}
+
+	public long getModelIDAtMouse() {
+		long modelInstanceID = Model.convertRGBToID(geometryBuffer.sampleColorAtPoint((int) MouseInput.getMousePos().x, (int) MouseInput.getMousePos().y, GL_COLOR_ATTACHMENT4));
+		return modelInstanceID;
 	}
 
 	@Override

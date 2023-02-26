@@ -29,6 +29,7 @@ public class AssetManager {
 
 		paths.put("lake_skybox", new String[] { "/skybox/lake/right.jpg", "/skybox/lake/left.jpg", "/skybox/lake/top.jpg", "/skybox/lake/bottom.jpg", "/skybox/lake/front.jpg", "/skybox/lake/back.jpg" });
 		paths.put("stars_skybox", new String[] { "/skybox/stars/right.png", "/skybox/stars/left.png", "/skybox/stars/top.png", "/skybox/stars/bottom.png", "/skybox/stars/front.png", "/skybox/stars/back.png" });
+		paths.put("green_skybox", new String[] { "/skybox/green_skybox/right.png", "/skybox/green_skybox/left.png", "/skybox/green_skybox/top.png", "/skybox/green_skybox/bottom.png", "/skybox/green_skybox/front.png", "/skybox/green_skybox/back.png" });
 	}
 
 	public static void loadModel(String name) {
