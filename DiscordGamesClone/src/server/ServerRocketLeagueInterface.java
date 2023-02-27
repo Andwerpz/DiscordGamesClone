@@ -3,6 +3,7 @@ package server;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import impulse2d.Body;
 import impulse2d.Circle;
@@ -27,7 +28,12 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 	private HashMap<Integer, Integer> pegToPlayer;
 	private HashMap<Integer, Integer> pegTypes;
 
-	private int ballID = -1; //peg id of the ball
+	private boolean batchLaunches = false;
+	private HashMap<Integer, Vec2> batchedLaunches; //pegID, forceVec
+	private HashMap<Integer, Boolean> launchStillDragging; //if it's still being dragged, don't apply the change. 
+
+	private HashMap<Integer, Integer> playerTeams; //playerID, team
+	private boolean assignTeams = false; //if true, will tell everyone once what team they are on
 
 	public ServerRocketLeagueInterface(GameServer server) {
 		super(server);
@@ -104,10 +110,10 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 			//give each player 1 peg to control
 			for (int i = 0; i < 10; i++) {
 				int pegID = this.generatePegID();
-				Body pegBody = new Body(new Circle(1f), (Math.random() - 0.5f) * 20, (Math.random() - 0.5f) * 20);
-				pegBody.setMass(1);
-				pegBody.setRestitution(0.7f);
 				int pegType = RocketLeagueState.PEG_TYPE_OCTANE;
+				Body pegBody = new Body(new Circle(1f), (Math.random() - 0.5f) * 20, (Math.random() - 0.5f) * 20);
+				pegBody.setMass(RocketLeagueState.pegTypeMasses.get(pegType));
+				pegBody.setRestitution(0.7f);
 
 				this.pegs.put(pegID, pegBody);
 				this.pegToPlayer.put(pegID, playerID);
@@ -118,25 +124,52 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		}
 
 		{
-			this.ballID = this.generatePegID();
 			Body pegBody = new Body(new Circle(1f), (Math.random() - 0.5f) * 20, (Math.random() - 0.5f) * 20);
 			pegBody.setMass(1);
 			pegBody.setRestitution(1f);
 			int pegType = RocketLeagueState.PEG_TYPE_BALL;
 
-			this.pegs.put(this.ballID, pegBody);
-			this.pegToPlayer.put(this.ballID, -1);
-			this.pegTypes.put(this.ballID, pegType);
+			this.pegs.put(RocketLeagueState.BALL_ID, pegBody);
+			this.pegToPlayer.put(RocketLeagueState.BALL_ID, -1);
+			this.pegTypes.put(RocketLeagueState.BALL_ID, pegType);
 
 			this.impulseScene.addBody(pegBody);
 		}
 
 		this.addPlayerPegs = true;
+
+		this.batchedLaunches = new HashMap<>();
+		this.launchStillDragging = new HashMap<>();
+
+		this.playerTeams = new HashMap<>();
+		this.assignTeams = true;
+		for (int playerID : this.server.getPlayersInGame()) {
+			this.playerTeams.put(playerID, RocketLeagueState.TEAM_WHITE);
+		}
 	}
 
 	@Override
 	public void update() {
 		this.impulseScene.tick();
+
+		if (!this.batchLaunches) {
+			HashSet<Integer> remove = new HashSet<Integer>();
+			for (int pegID : this.batchedLaunches.keySet()) {
+				if (this.launchStillDragging.get(pegID)) {
+					continue;
+				}
+
+				Body b = this.pegs.get(pegID);
+				Vec2 forceVec = this.batchedLaunches.get(pegID);
+				b.applyImpulse(forceVec, new Vec2(0));
+				remove.add(pegID);
+			}
+
+			for (int pegID : remove) {
+				this.batchedLaunches.remove(pegID);
+				this.launchStillDragging.remove(pegID);
+			}
+		}
 
 		for (int pegID : this.pegs.keySet()) {
 			Body b = this.pegs.get(pegID);
@@ -150,6 +183,15 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 
 	@Override
 	public void writePacket(PacketSender packetSender, int clientID) {
+		if (this.assignTeams) {
+			packetSender.startSection("rocket_league_assign_teams");
+			packetSender.write(this.playerTeams.size());
+			for (int playerID : this.playerTeams.keySet()) {
+				packetSender.write(playerID);
+				packetSender.write(this.playerTeams.get(playerID));
+			}
+		}
+
 		//run once at the start of the game. 
 		if (this.addPlayerPegs) {
 			packetSender.startSection("rocket_league_add_pegs");
@@ -175,6 +217,13 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 			packetSender.write(b.orient);
 		}
 
+		packetSender.startSection("rocket_league_batched_launches");
+		packetSender.write(this.batchedLaunches.size());
+		for (int pegID : this.batchedLaunches.keySet()) {
+			packetSender.write(pegID);
+			packetSender.write(this.batchedLaunches.get(pegID));
+		}
+
 	}
 
 	@Override
@@ -185,12 +234,12 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 	@Override
 	public void readSection(PacketListener packetListener, int clientID) throws IOException {
 		switch (packetListener.getSectionName()) {
-		case "rocket_league_launch_peg": {
+		case "rocket_league_write_launch": {
 			int pegID = packetListener.readInt();
-			Vec2 dir = packetListener.readVec2();
-
-			Body b = this.pegs.get(pegID);
-			b.applyImpulse(dir, new Vec2(0));
+			Vec2 launchVec = packetListener.readVec2();
+			boolean stillDragging = packetListener.readInt() == 1;
+			this.batchedLaunches.put(pegID, launchVec);
+			this.launchStillDragging.put(pegID, stillDragging);
 			break;
 		}
 		}

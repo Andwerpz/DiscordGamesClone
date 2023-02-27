@@ -2,6 +2,7 @@ package state;
 
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_C;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_P;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_B;
 
 import java.awt.Color;
 import java.io.IOException;
@@ -33,6 +34,10 @@ import util.Vec4;
 
 public class RocketLeagueState extends GameState {
 
+	//TODO team assignment; only people on the same team can see each others arrows
+	//TODO peg topper assignment
+	//TODO powerups, they are pretty much just special peg toppers that you can get
+
 	private static final int WORLD_SCENE = 0;
 	private static final int PARTICLE_SCENE = 1;
 	private static final int DECAL_SCENE = 2;
@@ -49,8 +54,23 @@ public class RocketLeagueState extends GameState {
 	public static final int PEG_TYPE_FENNEC = 2;
 	public static final int PEG_TYPE_DINGUS = 3;
 
-	//TODO put in all the densities for each peg type
+	public static final int TEAM_WHITE = 0;
+	public static final int TEAM_RED = 1;
+	public static final int TEAM_BLUE = 2;
+
+	public static final int BALL_ID = -1;
+
 	public static HashMap<Integer, Model> pegTopperModels;
+
+	public static HashMap<Integer, Float> pegTypeMasses = new HashMap<Integer, Float>() {
+		{
+			put(PEG_TYPE_BALL, 1f);
+			put(PEG_TYPE_OCTANE, 1f);
+			put(PEG_TYPE_DOMINUS, 1f);
+			put(PEG_TYPE_FENNEC, 1f);
+			put(PEG_TYPE_DINGUS, 6f);
+		}
+	};
 
 	private static float maxLaunchStrength = 20;
 	private static float maxLaunchPx = 300; //distance in screen pixels to achieve maximum force
@@ -77,10 +97,6 @@ public class RocketLeagueState extends GameState {
 
 	private boolean isDraggingPeg = false;
 	private int draggedPegID = -1;
-	private Vec2 draggingForceVec = new Vec2();
-
-	private long arrowBodyInstance;
-	private long arrowHeadInstance;
 
 	private PlayerInputController playerController;
 
@@ -88,7 +104,14 @@ public class RocketLeagueState extends GameState {
 	private HashMap<Integer, Long> pegTopperModelInstances;
 	private HashMap<Long, Long> topperToPeg;
 
+	//these are just for visuals. mostly. 
+	private HashMap<Integer, Vec2> batchedLaunches; //pegID, launch force vec
+	private HashMap<Integer, Long> batchedLaunchArrowBody;
+	private HashMap<Integer, Long> batchedLaunchArrowHead;
+
 	private long hoveredPeg;
+
+	private boolean isInGame = false;
 
 	public RocketLeagueState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
@@ -141,6 +164,10 @@ public class RocketLeagueState extends GameState {
 		this.arrowHeadModel = new Model("/rocket_league/arrow_head/", "arrow_head.obj");
 		this.arrowBodyModel = new Model("/rocket_league/arrow_body/", "arrow_body.obj");
 		this.flatRingModel = new Model("/rocket_league/flat_ring/", "flat_ring.obj");
+
+		this.batchedLaunches = new HashMap<>();
+		this.batchedLaunchArrowBody = new HashMap<>();
+		this.batchedLaunchArrowHead = new HashMap<>();
 	}
 
 	@Override
@@ -155,28 +182,6 @@ public class RocketLeagueState extends GameState {
 		float dx = nextMouse.x - this.mousePos.x;
 		float dy = nextMouse.y - this.mousePos.y;
 		this.mousePos.set(nextMouse);
-
-		//if dragging, draw indicator arrow 
-		if (this.isDraggingPeg) {
-			Vec2 forceVec = new Vec2(mousePressedPos, MouseInput.getMousePos());
-			forceVec.muli(maxLaunchArrowLen / maxLaunchPx);
-
-			float rads = (float) Math.atan2(forceVec.y, forceVec.x);
-			float length = Math.min(forceVec.length(), maxLaunchArrowLen);
-			Vec2 pegPos = this.gameInterface.getPegs().get(this.draggedPegID).position;
-
-			Mat4 bodyMat4 = Mat4.scale(length, 1, 0.2f);
-			bodyMat4.muli(Mat4.translate(1.1f, 0, 0));
-			bodyMat4.muli(Mat4.rotateY(rads));
-			bodyMat4.muli(Mat4.translate(pegPos.x, pegHeight / 2, pegPos.y));
-			Model.updateInstance(this.arrowBodyInstance, bodyMat4);
-
-			Mat4 headMat4 = Mat4.scale(0.4f, 1, 0.4f);
-			headMat4.muli(Mat4.translate(1.1f + length * 2, 0, 0));
-			headMat4.muli(Mat4.rotateY(rads));
-			headMat4.muli(Mat4.translate(pegPos.x, pegHeight / 2, pegPos.y));
-			Model.updateInstance(this.arrowHeadInstance, headMat4);
-		}
 
 		if (this.freeCamera) {
 			this.playerController.update();
@@ -200,6 +205,35 @@ public class RocketLeagueState extends GameState {
 				this.pegRings.put(pegID, ringInstanceID);
 				Model.updateInstance(ringInstanceID, new Material(Color.YELLOW));
 			}
+		}
+
+		//recolor pegs
+		if (this.gameInterface.hasNewTeamAssignment() || addedPegs.size() != 0) {
+			this.recolorPegs();
+		}
+
+		//get batched launches from server
+		HashMap<Integer, Vec2> incomingBatchedLaunches = this.gameInterface.getBatchedLaunches();
+		for (int pegID : incomingBatchedLaunches.keySet()) {
+			int playerID = this.gameInterface.getPegToPlayer().get(pegID);
+			int playerTeam = this.gameInterface.getPlayerTeams().get(playerID);
+			if (playerTeam != this.gameInterface.getPlayerTeams().get(this.client.getID())) {
+				//can't see intentions of other team
+				continue;
+			}
+			if (!this.batchedLaunches.containsKey(pegID)) {
+				this.addBatchedLaunch(pegID);
+			}
+			this.batchedLaunches.put(pegID, incomingBatchedLaunches.get(pegID));
+		}
+		HashSet<Integer> removeLaunch = new HashSet<>();
+		for (int pegID : this.batchedLaunches.keySet()) {
+			if (pegID != this.draggedPegID && !incomingBatchedLaunches.containsKey(pegID)) {
+				removeLaunch.add(pegID);
+			}
+		}
+		for (int pegID : removeLaunch) {
+			this.removeBatchedLaunch(pegID);
 		}
 
 		//update peg positions
@@ -227,6 +261,36 @@ public class RocketLeagueState extends GameState {
 				Mat4 ringMat4 = Mat4.translate(b.position.x, pegHeight / 2, b.position.y);
 				Model.updateInstance(ringInstanceID, ringMat4);
 			}
+		}
+
+		//if dragging, update force vec
+		if (this.isDraggingPeg) {
+			Vec2 forceVec = this.getLaunchForceVec();
+			forceVec.muli(maxLaunchStrength / maxLaunchPx);
+			forceVec.setLength(Math.min(maxLaunchStrength, forceVec.length()));
+			this.batchedLaunches.put(this.draggedPegID, forceVec);
+
+			this.gameInterface.writeLaunch(this.draggedPegID, forceVec, true);
+		}
+
+		for (int pegID : this.batchedLaunchArrowBody.keySet()) {
+			Vec2 forceVec = this.batchedLaunches.get(pegID).mul(maxLaunchArrowLen / maxLaunchStrength);
+
+			float rads = (float) Math.atan2(forceVec.y, forceVec.x);
+			float length = Math.min(forceVec.length(), maxLaunchArrowLen);
+			Vec2 pegPos = this.gameInterface.getPegs().get(pegID).position;
+
+			Mat4 bodyMat4 = Mat4.scale(length, 1, 0.2f);
+			bodyMat4.muli(Mat4.translate(1.1f, 0, 0));
+			bodyMat4.muli(Mat4.rotateY(rads));
+			bodyMat4.muli(Mat4.translate(pegPos.x, pegHeight / 2, pegPos.y));
+			Model.updateInstance(this.batchedLaunchArrowBody.get(pegID), bodyMat4);
+
+			Mat4 headMat4 = Mat4.scale(0.4f, 1, 0.4f);
+			headMat4.muli(Mat4.translate(1.1f + length * 2, 0, 0));
+			headMat4.muli(Mat4.rotateY(rads));
+			headMat4.muli(Mat4.translate(pegPos.x, pegHeight / 2, pegPos.y));
+			Model.updateInstance(this.batchedLaunchArrowHead.get(pegID), headMat4);
 		}
 	}
 
@@ -256,19 +320,94 @@ public class RocketLeagueState extends GameState {
 		this.uiScreen.render(outputBuffer);
 	}
 
-	private void launchPegs() {
-		Vec2 forceVec = new Vec2(mousePressedPos, MouseInput.getMousePos());
-		forceVec.muli(maxLaunchStrength / maxLaunchPx);
+	private void recolorPegs() {
+		for (int pegID : this.pegModelInstances.keySet()) {
+			if (pegID == BALL_ID) {
+				continue;
+			}
 
-		if (forceVec.lengthSq() > maxLaunchStrength * maxLaunchStrength) {
-			forceVec.setLength(maxLaunchStrength);
+			int playerID = this.gameInterface.getPegToPlayer().get(pegID);
+			int playerTeam = this.gameInterface.getPlayerTeams().get(playerID);
+			Material teamColor = null;
+
+			switch (playerTeam) {
+			case TEAM_WHITE:
+				teamColor = new Material(Color.WHITE);
+				break;
+
+			case TEAM_RED:
+				teamColor = new Material(Color.RED);
+				break;
+
+			case TEAM_BLUE:
+				teamColor = new Material(Color.BLUE);
+				break;
+			}
+
+			Model.updateInstance(this.pegModelInstances.get(pegID), teamColor);
+		}
+	}
+
+	private Vec2 getLaunchForceVec() {
+		if (!this.isDraggingPeg) {
+			return null;
+		}
+		Vec2 forceVec = new Vec2(mousePressedPos, MouseInput.getMousePos());
+		forceVec.muli(-1f);
+		return forceVec;
+	}
+
+	private void removePeg(int pegID) {
+		long pegInstance = this.pegModelInstances.get(pegID);
+		long topperInstance = this.pegTopperModelInstances.get(pegID);
+
+		Model.removeInstance(pegInstance);
+		Model.removeInstance(topperInstance);
+
+		this.pegModelInstances.remove(pegID);
+		this.pegTopperModelInstances.remove(pegID);
+
+		if (this.pegRings.containsKey(pegID)) {
+			Model.removeInstance(this.pegRings.get(pegID));
+			this.pegRings.remove(pegID);
 		}
 
-		this.gameInterface.launchPeg(this.draggedPegID, forceVec);
+		if (this.batchedLaunches.containsKey(pegID)) {
+			this.removeBatchedLaunch(pegID);
+		}
 
-		//remove arrow indicators
-		Model.removeInstance(this.arrowBodyInstance);
-		Model.removeInstance(this.arrowHeadInstance);
+	}
+
+	private void addBatchedLaunch(int pegID) {
+		if (!this.batchedLaunches.containsKey(pegID)) {
+			this.batchedLaunches.put(pegID, new Vec2(0));
+		}
+
+		//set up arrow models
+		if (!this.batchedLaunchArrowBody.containsKey(pegID)) {
+			long bodyID = Model.addInstance(this.arrowBodyModel, Mat4.identity(), WORLD_SCENE);
+			Model.updateInstance(bodyID, new Material(Color.YELLOW));
+			this.batchedLaunchArrowBody.put(pegID, bodyID);
+		}
+		if (!this.batchedLaunchArrowHead.containsKey(pegID)) {
+			long headID = Model.addInstance(this.arrowHeadModel, Mat4.identity(), WORLD_SCENE);
+			Model.updateInstance(headID, new Material(Color.YELLOW));
+			this.batchedLaunchArrowHead.put(pegID, headID);
+		}
+	}
+
+	private void removeBatchedLaunch(int pegID) {
+		if (!this.batchedLaunches.containsKey(pegID)) {
+			System.err.println("Tried to remove launch that didn't exist");
+			return;
+		}
+
+		Model.removeInstance(this.batchedLaunchArrowBody.get(pegID));
+		Model.removeInstance(this.batchedLaunchArrowHead.get(pegID));
+
+		this.batchedLaunchArrowBody.remove(pegID);
+		this.batchedLaunchArrowHead.remove(pegID);
+		this.batchedLaunches.remove(pegID);
 	}
 
 	@Override
@@ -281,12 +420,8 @@ public class RocketLeagueState extends GameState {
 			if (this.hoveredPeg == instanceID && this.gameInterface.getPegToPlayer().get(pegID) == this.client.getID()) {
 				this.isDraggingPeg = true;
 				this.draggedPegID = pegID;
-				this.draggingForceVec = new Vec2();
 
-				this.arrowBodyInstance = Model.addInstance(this.arrowBodyModel, Mat4.identity(), WORLD_SCENE);
-				this.arrowHeadInstance = Model.addInstance(this.arrowHeadModel, Mat4.identity(), WORLD_SCENE);
-				Model.updateInstance(this.arrowBodyInstance, new Material(Color.YELLOW));
-				Model.updateInstance(this.arrowHeadInstance, new Material(Color.YELLOW));
+				this.addBatchedLaunch(pegID);
 				break;
 			}
 		}
@@ -297,11 +432,12 @@ public class RocketLeagueState extends GameState {
 	public void _mouseReleased(int button) {
 		this.mousePressed = false;
 
-		//launch player owned peg in direction. 
 		if (this.isDraggingPeg) {
-			this.launchPegs();
+			//notify server that you stopped dragging
+			this.gameInterface.writeLaunch(this.draggedPegID, this.batchedLaunches.get(this.draggedPegID), false);
 		}
 		this.isDraggingPeg = false;
+		this.draggedPegID = -1;
 	}
 
 	@Override

@@ -21,9 +21,16 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 
 	private HashSet<Integer> addedPegs;
 
-	private boolean launchPeg = false;
+	private HashMap<Integer, Vec2> incomingBatchedLaunches;
+
+	private HashMap<Integer, Integer> playerTeams;
+	private boolean newTeamAssignment = false;
+
+	//write a launch to the server
+	private boolean writeLaunch = false;
 	private int launchPegID = -1;
-	private Vec2 launchPegDir;
+	private Vec2 launchVec = new Vec2(0);
+	private boolean launchStillDragging = false;
 
 	public ClientRocketLeagueInterface(GameClient client) {
 		super(client);
@@ -34,6 +41,10 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		this.pegTypes = new HashMap<>();
 
 		this.addedPegs = new HashSet<>();
+
+		this.incomingBatchedLaunches = new HashMap<>();
+
+		this.playerTeams = new HashMap<>();
 	}
 
 	@Override
@@ -44,11 +55,12 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 
 	@Override
 	public void writePacket(PacketSender packetSender) {
-		if (this.launchPeg) {
-			packetSender.startSection("rocket_league_launch_peg");
+		if (this.writeLaunch) {
+			packetSender.startSection("rocket_league_write_launch");
 			packetSender.write(this.launchPegID);
-			packetSender.write(this.launchPegDir);
-			this.launchPeg = false;
+			packetSender.write(this.launchVec);
+			packetSender.write(this.launchStillDragging ? 1 : 0);
+			this.writeLaunch = false;
 		}
 	}
 
@@ -68,6 +80,17 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 				this.pegTypes.put(pegID, pegType);
 				this.addedPegs.add(pegID);
 			}
+			break;
+		}
+
+		case "rocket_league_assign_teams": {
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				int playerID = packetListener.readInt();
+				int team = packetListener.readInt();
+				this.playerTeams.put(playerID, team);
+			}
+			this.newTeamAssignment = true;
 			break;
 		}
 
@@ -97,13 +120,41 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 			}
 			break;
 		}
+
+		case "rocket_league_batched_launches": {
+			this.incomingBatchedLaunches.clear();
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				int pegID = packetListener.readInt();
+				Vec2 launchVec = packetListener.readVec2();
+				this.incomingBatchedLaunches.put(pegID, launchVec);
+			}
+			break;
+		}
 		}
 	}
 
-	public void launchPeg(int pegID, Vec2 dir) {
-		this.launchPeg = true;
+	public boolean hasNewTeamAssignment() {
+		if (!this.newTeamAssignment) {
+			return false;
+		}
+		this.newTeamAssignment = false;
+		return true;
+	}
+
+	public HashMap<Integer, Integer> getPlayerTeams() {
+		return this.playerTeams;
+	}
+
+	public HashMap<Integer, Vec2> getBatchedLaunches() {
+		return this.incomingBatchedLaunches;
+	}
+
+	public void writeLaunch(int pegID, Vec2 launchVec, boolean stillDragging) {
+		this.writeLaunch = true;
 		this.launchPegID = pegID;
-		this.launchPegDir = dir;
+		this.launchVec.set(launchVec);
+		this.launchStillDragging = stillDragging;
 	}
 
 	public HashMap<Integer, Body> getPegs() {
