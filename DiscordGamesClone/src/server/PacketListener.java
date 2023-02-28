@@ -109,6 +109,15 @@ public class PacketListener implements Runnable {
 		return ans;
 	}
 
+	public long readLong() throws IOException {
+		long ans = 0;
+		for (int i = 0; i < 8; i++) {
+			ans <<= 8;
+			ans |= this.readByte() & 0xFF;
+		}
+		return ans;
+	}
+
 	public float readFloat() throws IOException {
 		return Float.intBitsToFloat(this.readInt());
 	}

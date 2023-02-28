@@ -20,6 +20,7 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 	private HashMap<Integer, Integer> pegTypes;
 
 	private HashSet<Integer> addedPegs;
+	private HashSet<Integer> removedPegs;
 
 	private HashMap<Integer, Vec2> incomingBatchedLaunches;
 
@@ -32,6 +33,19 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 	private Vec2 launchVec = new Vec2(0);
 	private boolean launchStillDragging = false;
 
+	private boolean startGame = false;
+
+	private int teamRedScore = 0;
+	private int teamBlueScore = 0;
+
+	private boolean scored = false;
+	private boolean redScored = false;
+
+	private long inputPhaseEndMillis;
+
+	private boolean isInGame = false;
+	private boolean gameStarted = false;
+
 	public ClientRocketLeagueInterface(GameClient client) {
 		super(client);
 
@@ -40,16 +54,16 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		this.pegToPlayer = new HashMap<>();
 		this.pegTypes = new HashMap<>();
 
-		this.addedPegs = new HashSet<>();
-
 		this.incomingBatchedLaunches = new HashMap<>();
 
 		this.playerTeams = new HashMap<>();
+
+		this.addedPegs = new HashSet<>();
+		this.removedPegs = new HashSet<>();
 	}
 
 	@Override
 	public void update() {
-		// TODO Auto-generated method stub
 
 	}
 
@@ -62,11 +76,46 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 			packetSender.write(this.launchStillDragging ? 1 : 0);
 			this.writeLaunch = false;
 		}
+
+		if (this.startGame) {
+			packetSender.startSection("rocket_league_start_game");
+			this.startGame = false;
+		}
 	}
 
 	@Override
 	public void readSection(PacketListener packetListener) throws IOException {
 		switch (packetListener.getSectionName()) {
+		case "rocket_league_start_game": {
+			this.teamRedScore = 0;
+			this.teamBlueScore = 0;
+			this.isInGame = true;
+			this.gameStarted = true;
+			break;
+		}
+
+		case "rocket_league_end_game": {
+			this.isInGame = false;
+			break;
+		}
+
+		case "rocket_league_start_input_phase": {
+			this.inputPhaseEndMillis = packetListener.readLong();
+			break;
+		}
+
+		case "rocket_league_score": {
+			this.scored = true;
+			this.redScored = packetListener.readInt() == 1;
+			if (this.redScored) {
+				this.teamRedScore++;
+			}
+			else {
+				this.teamBlueScore++;
+			}
+			break;
+		}
+
 		case "rocket_league_add_pegs": {
 			int amt = packetListener.readInt();
 			for (int i = 0; i < amt; i++) {
@@ -83,8 +132,22 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 			break;
 		}
 
+		case "rocket_league_remove_pegs": {
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				int pegID = packetListener.readInt();
+
+				this.pegs.remove(pegID);
+				this.pegToPlayer.remove(pegID);
+				this.pegTypes.remove(pegID);
+				this.removedPegs.add(pegID);
+			}
+			break;
+		}
+
 		case "rocket_league_assign_teams": {
 			int amt = packetListener.readInt();
+			this.playerTeams.clear();
 			for (int i = 0; i < amt; i++) {
 				int playerID = packetListener.readInt();
 				int team = packetListener.readInt();
@@ -124,13 +187,49 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		case "rocket_league_batched_launches": {
 			this.incomingBatchedLaunches.clear();
 			int amt = packetListener.readInt();
+			HashMap<Integer, Vec2> batchedLaunches = new HashMap<>();
 			for (int i = 0; i < amt; i++) {
 				int pegID = packetListener.readInt();
 				Vec2 launchVec = packetListener.readVec2();
-				this.incomingBatchedLaunches.put(pegID, launchVec);
+				batchedLaunches.put(pegID, launchVec);
 			}
+			this.incomingBatchedLaunches = batchedLaunches;
 			break;
 		}
+		}
+	}
+
+	public int getRedScore() {
+		return this.teamRedScore;
+	}
+
+	public int getBlueScore() {
+		return this.teamBlueScore;
+	}
+
+	public boolean gameStarted() {
+		if (!this.gameStarted) {
+			return false;
+		}
+		this.gameStarted = false;
+		return true;
+	}
+
+	public boolean isInGame() {
+		return this.isInGame;
+	}
+
+	public boolean inInputPhase() {
+		return System.currentTimeMillis() < this.inputPhaseEndMillis;
+	}
+
+	public long getInputPhaseEndMillis() {
+		return this.inputPhaseEndMillis;
+	}
+
+	public void startGame() {
+		if (this.client.isHost()) {
+			this.startGame = true;
 		}
 	}
 
@@ -147,7 +246,9 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 	}
 
 	public HashMap<Integer, Vec2> getBatchedLaunches() {
-		return this.incomingBatchedLaunches;
+		HashMap<Integer, Vec2> ret = new HashMap<>();
+		ret.putAll(this.incomingBatchedLaunches);
+		return ret;
 	}
 
 	public void writeLaunch(int pegID, Vec2 launchVec, boolean stillDragging) {
@@ -173,6 +274,13 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		HashSet<Integer> ret = new HashSet<>();
 		ret.addAll(this.addedPegs);
 		this.addedPegs.clear();
+		return ret;
+	}
+
+	public HashSet<Integer> getRemovedPegs() {
+		HashSet<Integer> ret = new HashSet<>();
+		ret.addAll(this.removedPegs);
+		this.removedPegs.clear();
 		return ret;
 	}
 

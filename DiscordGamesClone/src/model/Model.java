@@ -195,7 +195,12 @@ public class Model {
 					Vec2 uv = new Vec2((float) Math.random(), (float) Math.random());
 					if (j < AIuvs.limit()) {
 						AIVector3D v = AIuvs.get(j);
-						uv.set(new Vec2(v.x(), v.y()));
+						if (v.x() == 0.0 && v.y() == 0.0) {
+							uv.set(new Vec2((float) Math.random(), (float) Math.random()));
+						}
+						else {
+							uv.set(new Vec2(v.x(), v.y()));
+						}
 					}
 					uvs.get(matIndex).add(uv);
 				}

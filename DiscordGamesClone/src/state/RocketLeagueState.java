@@ -3,9 +3,12 @@ package state;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_C;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_P;
 import static org.lwjgl.glfw.GLFW.GLFW_KEY_B;
+import static org.lwjgl.glfw.GLFW.GLFW_KEY_E;
 
 import java.awt.Color;
+import java.awt.Font;
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -16,6 +19,8 @@ import graphics.Framebuffer;
 import graphics.Material;
 import impulse2d.Body;
 import impulse2d.Circle;
+import input.Button;
+import input.Input;
 import input.MouseInput;
 import main.Main;
 import model.AssetManager;
@@ -27,6 +32,10 @@ import scene.Scene;
 import screen.PerspectiveScreen;
 import screen.UIScreen;
 import server.PacketListener;
+import ui.Text;
+import ui.UIElement;
+import ui.UIFilledRectangle;
+import util.FontUtils;
 import util.Mat4;
 import util.Vec2;
 import util.Vec3;
@@ -34,19 +43,19 @@ import util.Vec4;
 
 public class RocketLeagueState extends GameState {
 
-	//TODO team assignment; only people on the same team can see each others arrows
 	//TODO peg topper assignment
-	//TODO powerups, they are pretty much just special peg toppers that you can get
+	//TODO powerups, or boost orbs
 
 	private static final int WORLD_SCENE = 0;
 	private static final int PARTICLE_SCENE = 1;
 	private static final int DECAL_SCENE = 2;
 
 	private static final int UI_BACKGROUND_SCENE = 3;
-	private static final int INPUT_SCENE = 4;
+	private static final int UI_TEXT_SCENE = 4;
+	private static final int INPUT_SCENE = 5;
 
 	//hardcoded from the peg model height. use so we can properly align the models that go ontop of the pegs
-	private static float pegHeight = 0.15f;
+	private static float pegHeight = 0.3f;
 
 	public static final int PEG_TYPE_BALL = -1;
 	public static final int PEG_TYPE_OCTANE = 0;
@@ -57,8 +66,6 @@ public class RocketLeagueState extends GameState {
 	public static final int TEAM_WHITE = 0;
 	public static final int TEAM_RED = 1;
 	public static final int TEAM_BLUE = 2;
-
-	public static final int BALL_ID = -1;
 
 	public static HashMap<Integer, Model> pegTopperModels;
 
@@ -113,6 +120,13 @@ public class RocketLeagueState extends GameState {
 
 	private boolean isInGame = false;
 
+	private UIElement scoreboard;
+	private Text redScoreText, blueScoreText, timerText;
+
+	private UIElement startGameRect;
+
+	private long hoveredInput;
+
 	public RocketLeagueState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
 
@@ -149,8 +163,8 @@ public class RocketLeagueState extends GameState {
 			pegTopperModels = new HashMap<>();
 			pegTopperModels.put(PEG_TYPE_BALL, new Model("/rocket_league/ball/", "ball.obj"));
 			pegTopperModels.put(PEG_TYPE_OCTANE, new Model("/rocket_league/octane/", "octane.obj"));
-			pegTopperModels.put(PEG_TYPE_DOMINUS, new Model("/rocket_league/ball/", "ball.obj"));
-			pegTopperModels.put(PEG_TYPE_FENNEC, new Model("/rocket_league/octane/", "octane.obj"));
+			pegTopperModels.put(PEG_TYPE_DOMINUS, new Model("/rocket_league/dominus/", "dominus.obj"));
+			pegTopperModels.put(PEG_TYPE_FENNEC, new Model("/rocket_league/fennec/", "fennec.obj"));
 			pegTopperModels.put(PEG_TYPE_DINGUS, new Model("/rocket_league/dingus/", "dingus.obj"));
 		}
 
@@ -168,6 +182,80 @@ public class RocketLeagueState extends GameState {
 		this.batchedLaunches = new HashMap<>();
 		this.batchedLaunchArrowBody = new HashMap<>();
 		this.batchedLaunchArrowHead = new HashMap<>();
+
+		this.drawUI();
+	}
+
+	public void drawUI() {
+		this.clearScene(UI_BACKGROUND_SCENE);
+		this.clearScene(UI_TEXT_SCENE);
+		this.clearScene(INPUT_SCENE);
+
+		//scoreboard
+		int scoreboardWidth = 300;
+		int scoreboardHeight = 80;
+
+		this.scoreboard = new UIFilledRectangle(0, -scoreboardHeight, 0, scoreboardWidth, scoreboardHeight, UI_BACKGROUND_SCENE);
+		this.scoreboard.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_TOP);
+		this.scoreboard.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_TOP);
+		this.scoreboard.setMaterial(LobbyState.lightGray);
+
+		UIFilledRectangle blueBackgroundRect = new UIFilledRectangle(0, 0, 0, scoreboardHeight, scoreboardHeight, UI_BACKGROUND_SCENE);
+		blueBackgroundRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_TOP);
+		blueBackgroundRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_TOP);
+		blueBackgroundRect.setMaterial(new Material(Color.BLUE));
+		blueBackgroundRect.bind(this.scoreboard);
+
+		UIFilledRectangle redBackgroundRect = new UIFilledRectangle(0, 0, 0, scoreboardHeight, scoreboardHeight, UI_BACKGROUND_SCENE);
+		redBackgroundRect.setFrameAlignmentStyle(UIElement.FROM_RIGHT, UIElement.FROM_TOP);
+		redBackgroundRect.setContentAlignmentStyle(UIElement.ALIGN_RIGHT, UIElement.ALIGN_TOP);
+		redBackgroundRect.setMaterial(new Material(Color.RED));
+		redBackgroundRect.bind(this.scoreboard);
+
+		this.blueScoreText = new Text(0, 0, "0", FontUtils.ggsans.deriveFont(Font.BOLD), 48, Color.WHITE, UI_TEXT_SCENE);
+		this.blueScoreText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_TOP);
+		this.blueScoreText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		this.blueScoreText.bind(blueBackgroundRect);
+
+		this.redScoreText = new Text(0, 0, "0", FontUtils.ggsans.deriveFont(Font.BOLD), 48, Color.WHITE, UI_TEXT_SCENE);
+		this.redScoreText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_TOP);
+		this.redScoreText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		this.redScoreText.bind(redBackgroundRect);
+
+		this.timerText = new Text(0, 0, "0.00", FontUtils.ggsans, 32, Color.WHITE, UI_TEXT_SCENE);
+		this.timerText.setFrameAlignmentStyle(UIElement.FROM_CENTER_LEFT, UIElement.FROM_CENTER_TOP);
+		this.timerText.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		this.timerText.bind(this.scoreboard);
+
+		//start game rect
+		this.startGameRect = new UIFilledRectangle(10, 10, 0, 200, 80, UI_BACKGROUND_SCENE);
+		this.startGameRect.setFrameAlignmentStyle(UIElement.FROM_LEFT, UIElement.FROM_BOTTOM);
+		this.startGameRect.setContentAlignmentStyle(UIElement.ALIGN_LEFT, UIElement.ALIGN_BOTTOM);
+		this.startGameRect.setMaterial(LobbyState.gray);
+
+		Button startGameBtn = new Button(0, 0, 190, 70, "btn_start_game", "Start Game", FontUtils.ggsans.deriveFont(Font.BOLD), 32, INPUT_SCENE);
+		startGameBtn.setFrameAlignmentStyle(UIElement.FROM_CENTER_RIGHT, UIElement.FROM_CENTER_TOP);
+		startGameBtn.setContentAlignmentStyle(UIElement.ALIGN_CENTER, UIElement.ALIGN_CENTER);
+		startGameBtn.bind(this.startGameRect);
+	}
+
+	private void updateScoreboard() {
+		this.blueScoreText.setText(this.gameInterface.getBlueScore() + "");
+		this.redScoreText.setText(this.gameInterface.getRedScore() + "");
+
+		long timeLeftMillis = this.gameInterface.getInputPhaseEndMillis() - System.currentTimeMillis();
+		timeLeftMillis = Math.max(timeLeftMillis, 0);
+		DecimalFormat df = new DecimalFormat("#.##");
+		df.setMinimumFractionDigits(2);
+		this.timerText.setText(df.format(timeLeftMillis / 1000.0f));
+
+		this.blueScoreText.setWidth(this.blueScoreText.getTextWidth());
+		this.redScoreText.setWidth(this.redScoreText.getTextWidth());
+		this.timerText.setWidth(this.timerText.getTextWidth());
+	}
+
+	public static int getRandomBasicPegType() {
+		return (int) (Math.random() * 3);
 	}
 
 	@Override
@@ -178,6 +266,8 @@ public class RocketLeagueState extends GameState {
 
 	@Override
 	public void _update() {
+		Input.inputsHovered(this.hoveredInput, INPUT_SCENE);
+
 		Vec2 nextMouse = MouseInput.getMousePos();
 		float dx = nextMouse.x - this.mousePos.x;
 		float dy = nextMouse.y - this.mousePos.y;
@@ -188,6 +278,17 @@ public class RocketLeagueState extends GameState {
 		}
 
 		// -- NETWORKING --
+		if (this.gameInterface.gameStarted()) {
+			this.startGameRect.easeYOffset(-100);
+			this.scoreboard.easeYOffset(0);
+		}
+		this.updateScoreboard();
+
+		HashSet<Integer> removedPegs = this.gameInterface.getRemovedPegs();
+		for (int pegID : removedPegs) {
+			this.removePeg(pegID);
+		}
+
 		HashSet<Integer> addedPegs = this.gameInterface.getAddedPegs();
 		for (int pegID : addedPegs) {
 			long instanceID = Model.addInstance(this.pegModel, Mat4.identity(), WORLD_SCENE);
@@ -210,6 +311,14 @@ public class RocketLeagueState extends GameState {
 		//recolor pegs
 		if (this.gameInterface.hasNewTeamAssignment() || addedPegs.size() != 0) {
 			this.recolorPegs();
+		}
+
+		//System.out.println(this.gameInterface.isInGame() + " " + this.gameInterface.inInputPhase());
+
+		if (!this.canDragPegs()) {
+			if (this.isDraggingPeg) {
+				this.releaseDraggedPeg();
+			}
 		}
 
 		//get batched launches from server
@@ -316,13 +425,17 @@ public class RocketLeagueState extends GameState {
 		this.uiScreen.setUIScene(UI_BACKGROUND_SCENE);
 		this.uiScreen.render(outputBuffer);
 
+		this.uiScreen.setUIScene(UI_TEXT_SCENE);
+		this.uiScreen.render(outputBuffer);
+
 		this.uiScreen.setUIScene(INPUT_SCENE);
 		this.uiScreen.render(outputBuffer);
+		this.hoveredInput = this.uiScreen.getEntityIDAtMouse();
 	}
 
 	private void recolorPegs() {
 		for (int pegID : this.pegModelInstances.keySet()) {
-			if (pegID == BALL_ID) {
+			if (this.gameInterface.getPegTypes().get(pegID) == PEG_TYPE_BALL) {
 				continue;
 			}
 
@@ -346,6 +459,10 @@ public class RocketLeagueState extends GameState {
 
 			Model.updateInstance(this.pegModelInstances.get(pegID), teamColor);
 		}
+	}
+
+	private boolean canDragPegs() {
+		return !this.gameInterface.isInGame() || this.gameInterface.inInputPhase();
 	}
 
 	private Vec2 getLaunchForceVec() {
@@ -376,6 +493,15 @@ public class RocketLeagueState extends GameState {
 			this.removeBatchedLaunch(pegID);
 		}
 
+	}
+
+	private void releaseDraggedPeg() {
+		if (this.isDraggingPeg) {
+			//notify server that you stopped dragging
+			this.gameInterface.writeLaunch(this.draggedPegID, this.batchedLaunches.get(this.draggedPegID), false);
+		}
+		this.isDraggingPeg = false;
+		this.draggedPegID = -1;
 	}
 
 	private void addBatchedLaunch(int pegID) {
@@ -412,17 +538,21 @@ public class RocketLeagueState extends GameState {
 
 	@Override
 	public void _mousePressed(int button) {
+		Input.inputsPressed(this.hoveredInput);
+
 		this.mousePressed = true;
 		this.mousePressedPos = MouseInput.getMousePos();
 
-		for (int pegID : this.gameInterface.getPegs().keySet()) {
-			long instanceID = this.pegModelInstances.get(pegID);
-			if (this.hoveredPeg == instanceID && this.gameInterface.getPegToPlayer().get(pegID) == this.client.getID()) {
-				this.isDraggingPeg = true;
-				this.draggedPegID = pegID;
+		if (this.canDragPegs()) {
+			for (int pegID : this.gameInterface.getPegs().keySet()) {
+				long instanceID = this.pegModelInstances.get(pegID);
+				if (this.hoveredPeg == instanceID && this.gameInterface.getPegToPlayer().get(pegID) == this.client.getID()) {
+					this.isDraggingPeg = true;
+					this.draggedPegID = pegID;
 
-				this.addBatchedLaunch(pegID);
-				break;
+					this.addBatchedLaunch(pegID);
+					break;
+				}
 			}
 		}
 
@@ -430,14 +560,17 @@ public class RocketLeagueState extends GameState {
 
 	@Override
 	public void _mouseReleased(int button) {
+		Input.inputsReleased(this.hoveredInput, INPUT_SCENE);
+		switch (Input.getClicked()) {
+		case "start_game_btn": {
+			this.gameInterface.startGame();
+			break;
+		}
+		}
+
 		this.mousePressed = false;
 
-		if (this.isDraggingPeg) {
-			//notify server that you stopped dragging
-			this.gameInterface.writeLaunch(this.draggedPegID, this.batchedLaunches.get(this.draggedPegID), false);
-		}
-		this.isDraggingPeg = false;
-		this.draggedPegID = -1;
+		this.releaseDraggedPeg();
 	}
 
 	@Override
@@ -454,6 +587,8 @@ public class RocketLeagueState extends GameState {
 				Main.lockCursor();
 			}
 			else {
+				this.perspectiveScreen.getCamera().setFacing(new Vec3(0f, 0f, -1f).rotateX(1.1082847f));
+				this.perspectiveScreen.getCamera().setPos(new Vec3(0, 15.43986f, 10.38977f));
 				Main.unlockCursor();
 			}
 		}

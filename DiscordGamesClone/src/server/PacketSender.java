@@ -120,6 +120,21 @@ public class PacketSender {
 		this.write(a, this.curSection);
 	}
 
+	private void write(long a, ArrayList<Byte> packet) {
+		this.write((byte) (0xFF & (a >> 56)), packet);
+		this.write((byte) (0xFF & (a >> 48)), packet);
+		this.write((byte) (0xFF & (a >> 40)), packet);
+		this.write((byte) (0xFF & (a >> 32)), packet);
+		this.write((byte) (0xFF & (a >> 24)), packet);
+		this.write((byte) (0xFF & (a >> 16)), packet);
+		this.write((byte) (0xFF & (a >> 8)), packet);
+		this.write((byte) (0xFF & (a >> 0)), packet);
+	}
+
+	public void write(long a) {
+		this.write(a, this.curSection);
+	}
+
 	private void write(int a, ArrayList<Byte> packet) {
 		this.write((byte) (0xFF & (a >> 24)), packet);
 		this.write((byte) (0xFF & (a >> 16)), packet);

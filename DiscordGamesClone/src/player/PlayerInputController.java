@@ -90,6 +90,18 @@ public class PlayerInputController extends Entity {
 		return this.camZRot;
 	}
 
+	public void setCamXRot(float f) {
+		this.camXRot = f;
+	}
+
+	public void setCamYRot(float f) {
+		this.camYRot = f;
+	}
+
+	public void setCamZRot(float f) {
+		this.camZRot = f;
+	}
+
 	public Vec3 getPos() {
 		return this.pos;
 	}

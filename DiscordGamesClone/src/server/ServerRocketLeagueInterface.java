@@ -7,6 +7,7 @@ import java.util.HashSet;
 
 import impulse2d.Body;
 import impulse2d.Circle;
+import impulse2d.ImpulseMath;
 import impulse2d.ImpulseScene;
 import impulse2d.Polygon;
 import impulse2d.Shape;
@@ -23,7 +24,9 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 	private ImpulseScene impulseScene;
 
 	private HashMap<Integer, Body> pegs;
-	private boolean addPlayerPegs = false; //this is true only once, when the game is first started
+
+	private ArrayList<Integer> addPegList;
+	private ArrayList<Integer> removePegList;
 
 	private HashMap<Integer, Integer> pegToPlayer;
 	private HashMap<Integer, Integer> pegTypes;
@@ -35,6 +38,30 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 	private HashMap<Integer, Integer> playerTeams; //playerID, team
 	private boolean assignTeams = false; //if true, will tell everyone once what team they are on
 
+	private boolean startGame = false;
+	private boolean startInputPhase = false;
+
+	private boolean endGame = false;
+
+	private boolean isInGame = false;
+	private boolean isInputPhase = false; //where everyone batches their inputs
+	private long inputPhaseEndMillis;
+	private long inputPhaseDurationMillis = 10 * 1000;
+
+	private static final int WINNING_SCORE = 5;
+
+	private int teamRedScore = 0;
+	private int teamBlueScore = 0;
+	private boolean scored = false;
+	private boolean redScored = false;
+	private boolean repositionPegsOnInputPhase = false;
+	private boolean hasScoredThisRound = false;
+
+	private int ballID = -1;
+
+	private static float fieldLeftBound = -20f;
+	private static float fieldRightBound = 20f;
+
 	public ServerRocketLeagueInterface(GameServer server) {
 		super(server);
 
@@ -45,8 +72,8 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		this.impulseScene.setSurfaceFrictionCoefficient(4f);
 
 		//create the walls for the soccer field
-		float x1 = -20;
-		float x2 = 20;
+		float x1 = fieldLeftBound;
+		float x2 = fieldRightBound;
 		float z1 = -10;
 		float z2 = 10;
 
@@ -94,6 +121,23 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		leftGoalWall.setRestitution(1f);
 		rightGoalWall.setRestitution(1f);
 
+		topWall.staticFriction = 0.2f;
+		topWall.dynamicFriction = 0.2f;
+		bottomWall.staticFriction = 0.2f;
+		bottomWall.dynamicFriction = 0.2f;
+		leftTopWall.staticFriction = 0.2f;
+		leftTopWall.dynamicFriction = 0.2f;
+		leftBottomWall.staticFriction = 0.2f;
+		leftBottomWall.dynamicFriction = 0.2f;
+		rightTopWall.staticFriction = 0.2f;
+		rightTopWall.dynamicFriction = 0.2f;
+		rightBottomWall.staticFriction = 0.2f;
+		rightBottomWall.dynamicFriction = 0.2f;
+		leftGoalWall.staticFriction = 0.2f;
+		leftGoalWall.dynamicFriction = 0.2f;
+		rightGoalWall.staticFriction = 0.2f;
+		rightGoalWall.dynamicFriction = 0.2f;
+
 		this.impulseScene.addBody(topWall);
 		this.impulseScene.addBody(bottomWall);
 		this.impulseScene.addBody(leftTopWall);
@@ -103,40 +147,8 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		this.impulseScene.addBody(leftGoalWall);
 		this.impulseScene.addBody(rightGoalWall);
 
-		this.pegs = new HashMap<>();
-		this.pegToPlayer = new HashMap<>();
-		this.pegTypes = new HashMap<>();
-		for (int playerID : this.server.getPlayersInGame()) {
-			//give each player 1 peg to control
-			for (int i = 0; i < 10; i++) {
-				int pegID = this.generatePegID();
-				int pegType = RocketLeagueState.PEG_TYPE_OCTANE;
-				Body pegBody = new Body(new Circle(1f), (Math.random() - 0.5f) * 20, (Math.random() - 0.5f) * 20);
-				pegBody.setMass(RocketLeagueState.pegTypeMasses.get(pegType));
-				pegBody.setRestitution(0.7f);
-
-				this.pegs.put(pegID, pegBody);
-				this.pegToPlayer.put(pegID, playerID);
-				this.pegTypes.put(pegID, pegType);
-
-				this.impulseScene.addBody(pegBody);
-			}
-		}
-
-		{
-			Body pegBody = new Body(new Circle(1f), (Math.random() - 0.5f) * 20, (Math.random() - 0.5f) * 20);
-			pegBody.setMass(1);
-			pegBody.setRestitution(1f);
-			int pegType = RocketLeagueState.PEG_TYPE_BALL;
-
-			this.pegs.put(RocketLeagueState.BALL_ID, pegBody);
-			this.pegToPlayer.put(RocketLeagueState.BALL_ID, -1);
-			this.pegTypes.put(RocketLeagueState.BALL_ID, pegType);
-
-			this.impulseScene.addBody(pegBody);
-		}
-
-		this.addPlayerPegs = true;
+		this.addPegList = new ArrayList<>();
+		this.removePegList = new ArrayList<>();
 
 		this.batchedLaunches = new HashMap<>();
 		this.launchStillDragging = new HashMap<>();
@@ -146,11 +158,80 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		for (int playerID : this.server.getPlayersInGame()) {
 			this.playerTeams.put(playerID, RocketLeagueState.TEAM_WHITE);
 		}
+
+		this.pegs = new HashMap<>();
+		this.pegToPlayer = new HashMap<>();
+		this.pegTypes = new HashMap<>();
+		for (int playerID : this.server.getPlayersInGame()) {
+			//give each player 1 peg to control
+			for (int i = 0; i < 1; i++) {
+				int pegID = this.addPeg(playerID, RocketLeagueState.getRandomBasicPegType());
+			}
+		}
+
+		{
+			this.ballID = this.addPeg(-1, RocketLeagueState.PEG_TYPE_BALL);
+			Body pegBody = this.pegs.get(this.ballID);
+			pegBody.setMass(1);
+			pegBody.setRestitution(1f);
+		}
+
+		this.repositionPegs();
 	}
 
 	@Override
 	public void update() {
 		this.impulseScene.tick();
+
+		boolean allStopped = true;
+		for (int pegID : this.pegs.keySet()) {
+			Body b = this.pegs.get(pegID);
+
+			if (b.velocity.length() > 0.01f) {
+				allStopped = false;
+			}
+
+			switch (this.pegTypes.get(pegID)) {
+			case RocketLeagueState.PEG_TYPE_DINGUS:
+				b.angularVelocity = (float) Math.PI / 2;
+				break;
+			}
+		}
+
+		if (this.isInGame) {
+			if (this.isInputPhase) {
+				//TODO see if everyone has batched an input
+
+				if (this.inputPhaseEndMillis < System.currentTimeMillis()) {
+					this.endInputPhase();
+				}
+			}
+			else {
+				if (allStopped) {
+					this.startInputPhase();
+				}
+
+				//check to see if someone scored
+				if (!this.hasScoredThisRound) {
+					Body ball = this.pegs.get(this.ballID);
+					if (ball.position.x < fieldLeftBound) {
+						this.teamRedScore++;
+						this.scored = true;
+						this.redScored = true;
+						this.repositionPegsOnInputPhase = true;
+						this.hasScoredThisRound = true;
+					}
+					if (ball.position.x > fieldRightBound) {
+						this.teamBlueScore++;
+						this.scored = true;
+						this.redScored = false;
+						this.repositionPegsOnInputPhase = true;
+						this.hasScoredThisRound = true;
+					}
+				}
+
+			}
+		}
 
 		if (!this.batchLaunches) {
 			HashSet<Integer> remove = new HashSet<Integer>();
@@ -170,19 +251,28 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 				this.launchStillDragging.remove(pegID);
 			}
 		}
-
-		for (int pegID : this.pegs.keySet()) {
-			Body b = this.pegs.get(pegID);
-			switch (this.pegTypes.get(pegID)) {
-			case RocketLeagueState.PEG_TYPE_DINGUS:
-				b.angularVelocity = (float) Math.PI / 2;
-				break;
-			}
-		}
 	}
 
 	@Override
 	public void writePacket(PacketSender packetSender, int clientID) {
+		if (this.startGame) {
+			packetSender.startSection("rocket_league_start_game");
+		}
+
+		if (this.endGame) {
+			packetSender.startSection("rocket_league_end_game");
+		}
+
+		if (this.startInputPhase) {
+			packetSender.startSection("rocket_league_start_input_phase");
+			packetSender.write(this.inputPhaseEndMillis);
+		}
+
+		if (this.scored) {
+			packetSender.startSection("rocket_league_score");
+			packetSender.write(this.redScored ? 1 : 0);
+		}
+
 		if (this.assignTeams) {
 			packetSender.startSection("rocket_league_assign_teams");
 			packetSender.write(this.playerTeams.size());
@@ -193,13 +283,21 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		}
 
 		//run once at the start of the game. 
-		if (this.addPlayerPegs) {
+		if (this.addPegList.size() != 0) {
 			packetSender.startSection("rocket_league_add_pegs");
-			packetSender.write(this.pegs.size());
-			for (int pegID : this.pegs.keySet()) {
+			packetSender.write(this.addPegList.size());
+			for (int pegID : this.addPegList) {
 				packetSender.write(pegID);
 				packetSender.write(this.pegTypes.get(pegID));
 				packetSender.write(this.pegToPlayer.get(pegID));
+			}
+		}
+
+		if (this.removePegList.size() != 0) {
+			packetSender.startSection("rocket_league_remove_pegs");
+			packetSender.write(this.removePegList.size());
+			for (int pegID : this.removePegList) {
+				packetSender.write(pegID);
 			}
 		}
 
@@ -228,7 +326,13 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 
 	@Override
 	public void writePacketEND() {
-		this.addPlayerPegs = false;
+		this.addPegList.clear();
+		this.removePegList.clear();
+
+		this.assignTeams = false;
+		this.scored = false;
+		this.startGame = false;
+		this.endGame = false;
 	}
 
 	@Override
@@ -242,7 +346,139 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 			this.launchStillDragging.put(pegID, stillDragging);
 			break;
 		}
+
+		case "rocket_league_start_game": {
+			if (!this.isInGame) {
+				this.initializeGame();
+			}
+			break;
 		}
+		}
+	}
+
+	private void startInputPhase() {
+		if (this.teamRedScore >= WINNING_SCORE || this.teamBlueScore >= WINNING_SCORE) {
+			this.endGame();
+			return;
+		}
+
+		this.isInputPhase = true;
+		this.batchLaunches = true;
+		this.inputPhaseEndMillis = System.currentTimeMillis() + this.inputPhaseDurationMillis;
+		this.startInputPhase = true;
+
+		if (this.repositionPegsOnInputPhase) {
+			this.repositionPegs();
+			this.repositionPegsOnInputPhase = false;
+		}
+	}
+
+	private void endInputPhase() {
+		this.isInputPhase = false;
+		this.batchLaunches = false;
+		this.hasScoredThisRound = false;
+	}
+
+	private void initializeGame() {
+		this.startGame = true;
+
+		this.teamRedScore = 0;
+		this.teamBlueScore = 0;
+
+		//assign teams
+		this.playerTeams.clear();
+		this.assignTeams = true;
+		for (int pegID : this.pegs.keySet()) {
+			int pegType = this.pegTypes.get(pegID);
+			if (pegType == RocketLeagueState.PEG_TYPE_BALL) {
+				continue;
+			}
+
+			int playerID = this.pegToPlayer.get(pegID);
+			Body b = this.pegs.get(pegID);
+			if (b.position.x < 0) {
+				this.playerTeams.put(playerID, RocketLeagueState.TEAM_BLUE);
+			}
+			else {
+				this.playerTeams.put(playerID, RocketLeagueState.TEAM_RED);
+			}
+		}
+
+		//give everyone an extra peg
+		for (int playerID : this.server.getPlayersInGame()) {
+			this.addPeg(playerID, RocketLeagueState.getRandomBasicPegType());
+		}
+
+		System.out.println(this.pegToPlayer);
+		System.out.println(this.pegTypes);
+
+		this.repositionPegs();
+
+		this.isInGame = true;
+		this.startInputPhase();
+	}
+
+	private void endGame() {
+		//removes a peg from everyone, and sets everyone to white team
+
+		HashSet<Integer> removedPeg = new HashSet<Integer>();
+		HashSet<Integer> remove = new HashSet<>();
+		for (int pegID : this.pegs.keySet()) {
+			int pegType = this.pegTypes.get(pegID);
+			if (pegType == RocketLeagueState.PEG_TYPE_BALL) {
+				continue;
+			}
+
+			int playerID = this.pegToPlayer.get(pegID);
+			if (removedPeg.contains(playerID)) {
+				continue;
+			}
+
+			remove.add(pegID);
+			removedPeg.add(playerID);
+		}
+		for (int pegID : remove) {
+			this.removePeg(pegID);
+		}
+
+		for (int playerID : this.server.getPlayersInGame()) {
+			this.playerTeams.put(playerID, RocketLeagueState.TEAM_WHITE);
+		}
+		this.assignTeams = true;
+
+		this.isInGame = false;
+		this.endGame = true;
+	}
+
+	private void repositionPegs() {
+		//move pegs based off of what team each player is on
+		//also reset velocity of each peg. 
+		//puts ball peg to center
+
+		for (int pegID : this.pegs.keySet()) {
+			Body b = this.pegs.get(pegID);
+			Vec2 rVec = new Vec2((Math.random() - 0.5f) * 10, (Math.random() - 0.5f) * 10);
+			b.position.set(rVec);
+			b.velocity.set(new Vec2(0));
+
+			int pegType = this.pegTypes.get(pegID);
+			if (pegType == RocketLeagueState.PEG_TYPE_BALL) {
+				b.position.set(new Vec2(0, 0));
+				continue;
+			}
+
+			int pegTeam = this.playerTeams.get(this.pegToPlayer.get(pegID));
+			switch (pegTeam) {
+			case RocketLeagueState.TEAM_BLUE:
+				b.position.addi(new Vec2(-10, 0));
+				break;
+
+			case RocketLeagueState.TEAM_RED:
+				b.position.addi(new Vec2(10, 0));
+				break;
+			}
+		}
+
 	}
 
 	private int generatePegID() {
@@ -251,6 +487,36 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 			id = (int) (Math.random() * 1000000);
 		}
 		return id;
+	}
+
+	private int addPeg(int playerID, int pegType) {
+		int pegID = this.generatePegID();
+		Body pegBody = new Body(new Circle(1f), 0, 0);
+		pegBody.setMass(RocketLeagueState.pegTypeMasses.get(pegType));
+		pegBody.setRestitution(0.7f);
+		pegBody.dynamicFriction = 0.1f;
+		pegBody.staticFriction = 0.1f;
+
+		this.pegs.put(pegID, pegBody);
+		this.pegToPlayer.put(pegID, playerID);
+		this.pegTypes.put(pegID, pegType);
+
+		this.impulseScene.addBody(pegBody);
+
+		this.addPegList.add(pegID);
+
+		return pegID;
+	}
+
+	private void removePeg(int pegID) {
+		Body b = this.pegs.get(pegID);
+		this.impulseScene.removeBody(b);
+
+		this.pegs.remove(pegID);
+		this.pegToPlayer.remove(pegID);
+		this.pegTypes.remove(pegID);
+
+		this.removePegList.add(pegID);
 	}
 
 }
