@@ -241,7 +241,7 @@ public class LobbyState extends State {
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/letter_league_v1.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/blazing_eights.png", Texture.VERTICAL_FLIP_BIT)));
 		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/crack_heads_final.png", Texture.VERTICAL_FLIP_BIT)));
-		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/rocket_league.png", Texture.VERTICAL_FLIP_BIT)));
+		this.backgroundTextures.add(new TextureMaterial(new Texture("/lobby/bobble_league.png", Texture.VERTICAL_FLIP_BIT)));
 
 		// -- UI BACKGROUND --
 		this.clearScene(BACKGROUND_UI_SCENE);

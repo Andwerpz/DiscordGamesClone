@@ -1,6 +1,7 @@
 package client;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
@@ -8,6 +9,7 @@ import impulse2d.Body;
 import impulse2d.Circle;
 import server.PacketListener;
 import server.PacketSender;
+import util.Pair;
 import util.Vec2;
 import util.Vec3;
 
@@ -45,6 +47,13 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 
 	private boolean isInGame = false;
 	private boolean gameStarted = false;
+	private boolean gameEnded = false;
+
+	private ArrayList<Integer> updPegTypeList;
+
+	private HashMap<Integer, Pair<Vec2, Integer>> powerups;
+	private ArrayList<Integer> addedPowerups;
+	private ArrayList<Integer> removedPowerups;
 
 	public ClientRocketLeagueInterface(GameClient client) {
 		super(client);
@@ -60,6 +69,12 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 
 		this.addedPegs = new HashSet<>();
 		this.removedPegs = new HashSet<>();
+
+		this.updPegTypeList = new ArrayList<>();
+
+		this.powerups = new HashMap<>();
+		this.addedPowerups = new ArrayList<>();
+		this.removedPowerups = new ArrayList<>();
 	}
 
 	@Override
@@ -96,6 +111,7 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 
 		case "rocket_league_end_game": {
 			this.isInGame = false;
+			this.gameEnded = true;
 			break;
 		}
 
@@ -141,6 +157,42 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 				this.pegToPlayer.remove(pegID);
 				this.pegTypes.remove(pegID);
 				this.removedPegs.add(pegID);
+			}
+			break;
+		}
+
+		case "rocket_league_assign_peg_type": {
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				int pegID = packetListener.readInt();
+				int pegType = packetListener.readInt();
+
+				this.pegTypes.put(pegID, pegType);
+				this.updPegTypeList.add(pegID);
+			}
+			break;
+		}
+
+		case "rocket_league_add_powerup": {
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				int powerupID = packetListener.readInt();
+				Vec2 pos = packetListener.readVec2();
+				int type = packetListener.readInt();
+
+				this.powerups.put(powerupID, new Pair<Vec2, Integer>(pos, type));
+				this.addedPowerups.add(powerupID);
+			}
+			break;
+		}
+
+		case "rocket_league_remove_powerup": {
+			int amt = packetListener.readInt();
+			for (int i = 0; i < amt; i++) {
+				int powerupID = packetListener.readInt();
+
+				this.powerups.remove(powerupID);
+				this.removedPowerups.add(powerupID);
 			}
 			break;
 		}
@@ -199,6 +251,31 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		}
 	}
 
+	public HashMap<Integer, Pair<Vec2, Integer>> getPowerups() {
+		return this.powerups;
+	}
+
+	public ArrayList<Integer> getAddedPowerups() {
+		ArrayList<Integer> ret = new ArrayList<>();
+		ret.addAll(this.addedPowerups);
+		this.addedPowerups.clear();
+		return ret;
+	}
+
+	public ArrayList<Integer> getRemovedPowerups() {
+		ArrayList<Integer> ret = new ArrayList<>();
+		ret.addAll(this.removedPowerups);
+		this.removedPowerups.clear();
+		return ret;
+	}
+
+	public ArrayList<Integer> getUpdPegTypeList() {
+		ArrayList<Integer> ret = new ArrayList<>();
+		ret.addAll(this.updPegTypeList);
+		this.updPegTypeList.clear();
+		return ret;
+	}
+
 	public int getRedScore() {
 		return this.teamRedScore;
 	}
@@ -212,6 +289,14 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 			return false;
 		}
 		this.gameStarted = false;
+		return true;
+	}
+
+	public boolean gameEnded() {
+		if (!this.gameEnded) {
+			return false;
+		}
+		this.gameEnded = false;
 		return true;
 	}
 

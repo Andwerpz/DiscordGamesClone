@@ -43,8 +43,12 @@ import util.Vec4;
 
 public class RocketLeagueState extends GameState {
 
-	//TODO peg topper assignment
-	//TODO powerups, or boost orbs
+	// -- IMPORTANT --
+	//peg topper assignment
+	//boost orbs
+
+	// -- not so important --
+	//some sort of effect when a goal is scored?
 
 	private static final int WORLD_SCENE = 0;
 	private static final int PARTICLE_SCENE = 1;
@@ -62,6 +66,8 @@ public class RocketLeagueState extends GameState {
 	public static final int PEG_TYPE_DOMINUS = 1;
 	public static final int PEG_TYPE_FENNEC = 2;
 	public static final int PEG_TYPE_DINGUS = 3;
+	public static final int PEG_TYPE_TANK = 4;
+	public static final int PEG_TYPE_SMART_CAR = 5;
 
 	public static final int TEAM_WHITE = 0;
 	public static final int TEAM_RED = 1;
@@ -75,7 +81,9 @@ public class RocketLeagueState extends GameState {
 			put(PEG_TYPE_OCTANE, 1f);
 			put(PEG_TYPE_DOMINUS, 1f);
 			put(PEG_TYPE_FENNEC, 1f);
-			put(PEG_TYPE_DINGUS, 6f);
+			put(PEG_TYPE_DINGUS, 4f);
+			put(PEG_TYPE_TANK, 2f);
+			put(PEG_TYPE_SMART_CAR, 0.5f);
 		}
 	};
 
@@ -127,6 +135,9 @@ public class RocketLeagueState extends GameState {
 
 	private long hoveredInput;
 
+	private HashMap<Integer, Long> powerupAddMillis;
+	private HashMap<Integer, Long> powerupModelInstances;
+
 	public RocketLeagueState(StateManager sm, GameClient client, State mainLobbyState) {
 		super(sm, client, mainLobbyState);
 
@@ -166,6 +177,8 @@ public class RocketLeagueState extends GameState {
 			pegTopperModels.put(PEG_TYPE_DOMINUS, new Model("/rocket_league/dominus/", "dominus.obj"));
 			pegTopperModels.put(PEG_TYPE_FENNEC, new Model("/rocket_league/fennec/", "fennec.obj"));
 			pegTopperModels.put(PEG_TYPE_DINGUS, new Model("/rocket_league/dingus/", "dingus.obj"));
+			pegTopperModels.put(PEG_TYPE_TANK, new Model("/rocket_league/tank/", "m1_abrams.obj"));
+			pegTopperModels.put(PEG_TYPE_SMART_CAR, new Model("/rocket_league/smart_car/", "smart_car.obj"));
 		}
 
 		this.pegModel = new Model("/rocket_league/peg/", "peg.obj");
@@ -182,6 +195,9 @@ public class RocketLeagueState extends GameState {
 		this.batchedLaunches = new HashMap<>();
 		this.batchedLaunchArrowBody = new HashMap<>();
 		this.batchedLaunchArrowHead = new HashMap<>();
+
+		this.powerupAddMillis = new HashMap<>();
+		this.powerupModelInstances = new HashMap<>();
 
 		this.drawUI();
 	}
@@ -255,7 +271,13 @@ public class RocketLeagueState extends GameState {
 	}
 
 	public static int getRandomBasicPegType() {
-		return (int) (Math.random() * 3);
+		int[] basicPegs = new int[] { PEG_TYPE_OCTANE, PEG_TYPE_DOMINUS, PEG_TYPE_FENNEC };
+		return basicPegs[(int) (Math.random() * basicPegs.length)];
+	}
+
+	public static int getRandomAdvancedPegType() {
+		int[] advPegs = new int[] { PEG_TYPE_DINGUS, PEG_TYPE_TANK, PEG_TYPE_SMART_CAR };
+		return advPegs[(int) (Math.random() * advPegs.length)];
 	}
 
 	@Override
@@ -281,6 +303,9 @@ public class RocketLeagueState extends GameState {
 		if (this.gameInterface.gameStarted()) {
 			this.startGameRect.easeYOffset(-100);
 			this.scoreboard.easeYOffset(0);
+		}
+		if (this.gameInterface.gameEnded()) {
+			this.startGameRect.easeYOffset(10);
 		}
 		this.updateScoreboard();
 
@@ -313,7 +338,50 @@ public class RocketLeagueState extends GameState {
 			this.recolorPegs();
 		}
 
-		//System.out.println(this.gameInterface.isInGame() + " " + this.gameInterface.inInputPhase());
+		//update peg type
+		ArrayList<Integer> updPegType = this.gameInterface.getUpdPegTypeList();
+		for (int pegID : updPegType) {
+			//get rid of old topper
+			long oldTopperID = this.pegTopperModelInstances.get(pegID);
+			Model.removeInstance(oldTopperID);
+			this.topperToPeg.remove(oldTopperID);
+
+			//add new topper
+			int pegType = this.gameInterface.getPegTypes().get(pegID);
+			long topperInstanceID = Model.addInstance(pegTopperModels.get(pegType), Mat4.identity(), WORLD_SCENE);
+			this.pegTopperModelInstances.put(pegID, topperInstanceID);
+			this.topperToPeg.put(topperInstanceID, this.pegModelInstances.get(pegID));
+		}
+
+		//process added powerups
+		ArrayList<Integer> addedPowerups = this.gameInterface.getAddedPowerups();
+		ArrayList<Integer> removedPowerups = this.gameInterface.getRemovedPowerups();
+		for (int powerupID : addedPowerups) {
+			this.powerupAddMillis.put(powerupID, System.currentTimeMillis());
+
+			int type = this.gameInterface.getPowerups().get(powerupID).second;
+
+			long modelInstanceID = Model.addInstance(RocketLeagueState.pegTopperModels.get(type), Mat4.identity(), WORLD_SCENE);
+			this.powerupModelInstances.put(powerupID, modelInstanceID);
+		}
+		for (int powerupID : removedPowerups) {
+			this.powerupAddMillis.remove(powerupID);
+			Model.removeInstance(this.powerupModelInstances.get(powerupID));
+			this.powerupModelInstances.remove(powerupID);
+		}
+
+		//upd powerup model instances
+		for (int powerupID : this.powerupModelInstances.keySet()) {
+			float rot = (float) (Math.toRadians(System.currentTimeMillis() - this.powerupAddMillis.get(powerupID))) * 0.07f;
+			float y = (float) (Math.cos(rot * 0.723) * 0.2) + 0.4f;
+			Vec2 pos = this.gameInterface.getPowerups().get(powerupID).first;
+
+			Mat4 mat4 = Mat4.scale(0.75f);
+			mat4.muli(Mat4.rotateY(rot));
+			mat4.muli(Mat4.translate(pos.x, y, pos.y));
+
+			Model.updateInstance(this.powerupModelInstances.get(powerupID), mat4);
+		}
 
 		if (!this.canDragPegs()) {
 			if (this.isDraggingPeg) {
@@ -562,7 +630,7 @@ public class RocketLeagueState extends GameState {
 	public void _mouseReleased(int button) {
 		Input.inputsReleased(this.hoveredInput, INPUT_SCENE);
 		switch (Input.getClicked()) {
-		case "start_game_btn": {
+		case "btn_start_game": {
 			this.gameInterface.startGame();
 			break;
 		}

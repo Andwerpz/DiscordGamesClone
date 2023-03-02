@@ -12,6 +12,8 @@ import impulse2d.ImpulseScene;
 import impulse2d.Polygon;
 import impulse2d.Shape;
 import state.RocketLeagueState;
+import util.MathUtils;
+import util.Pair;
 import util.Vec2;
 
 public class ServerRocketLeagueInterface extends ServerGameInterface {
@@ -61,6 +63,14 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 
 	private static float fieldLeftBound = -20f;
 	private static float fieldRightBound = 20f;
+
+	private HashMap<Integer, Pair<Vec2, Integer>> powerups;
+	private ArrayList<Integer> addPowerupList;
+	private ArrayList<Integer> removePowerupList;
+
+	private ArrayList<Pair<Integer, Integer>> assignPegTypeList; //pegID, type
+
+	private int roundCnt = 0;
 
 	public ServerRocketLeagueInterface(GameServer server) {
 		super(server);
@@ -153,6 +163,12 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		this.batchedLaunches = new HashMap<>();
 		this.launchStillDragging = new HashMap<>();
 
+		this.powerups = new HashMap<>();
+		this.addPowerupList = new ArrayList<>();
+		this.removePowerupList = new ArrayList<>();
+
+		this.assignPegTypeList = new ArrayList<>();
+
 		this.playerTeams = new HashMap<>();
 		this.assignTeams = true;
 		for (int playerID : this.server.getPlayersInGame()) {
@@ -182,6 +198,30 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 	@Override
 	public void update() {
 		this.impulseScene.tick();
+
+		//apply powerups
+		HashSet<Integer> usedPowerups = new HashSet<>();
+		for (int powerupID : this.powerups.keySet()) {
+			Vec2 powerupPos = this.powerups.get(powerupID).first;
+			int powerupType = this.powerups.get(powerupID).second;
+			for (int pegID : this.pegs.keySet()) {
+				if (pegID == this.ballID) {
+					continue;
+				}
+
+				Vec2 pegPos = this.pegs.get(pegID).position;
+				float dist = powerupPos.distance(pegPos);
+				if (dist < 1.2f) {
+					//give powerup to player
+					this.assignPegType(pegID, powerupType);
+					usedPowerups.add(powerupID);
+					break;
+				}
+			}
+		}
+		for (int powerupID : usedPowerups) {
+			this.removePowerup(powerupID);
+		}
 
 		boolean allStopped = true;
 		for (int pegID : this.pegs.keySet()) {
@@ -301,7 +341,32 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 			}
 		}
 
-		//TODO changing peg types
+		if (this.assignPegTypeList.size() != 0) {
+			packetSender.startSection("rocket_league_assign_peg_type");
+			packetSender.write(this.assignPegTypeList.size());
+			for (Pair<Integer, Integer> p : this.assignPegTypeList) {
+				packetSender.write(p.first);
+				packetSender.write(p.second);
+			}
+		}
+
+		if (this.addPowerupList.size() != 0) {
+			packetSender.startSection("rocket_league_add_powerup");
+			packetSender.write(this.addPowerupList.size());
+			for (int powerupID : this.addPowerupList) {
+				packetSender.write(powerupID);
+				packetSender.write(this.powerups.get(powerupID).first);
+				packetSender.write(this.powerups.get(powerupID).second);
+			}
+		}
+
+		if (this.removePowerupList.size() != 0) {
+			packetSender.startSection("rocket_league_remove_powerup");
+			packetSender.write(this.removePowerupList.size());
+			for (int powerupID : this.removePowerupList) {
+				packetSender.write(powerupID);
+			}
+		}
 
 		//sends the current state of the physics scene
 		packetSender.startSection("rocket_league_peg_info");
@@ -333,6 +398,11 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		this.scored = false;
 		this.startGame = false;
 		this.endGame = false;
+
+		this.addPowerupList.clear();
+		this.removePowerupList.clear();
+
+		this.assignPegTypeList.clear();
 	}
 
 	@Override
@@ -367,6 +437,10 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		this.inputPhaseEndMillis = System.currentTimeMillis() + this.inputPhaseDurationMillis;
 		this.startInputPhase = true;
 
+		if (this.roundCnt % 3 == 0) {
+			this.addPowerup();
+		}
+
 		if (this.repositionPegsOnInputPhase) {
 			this.repositionPegs();
 			this.repositionPegsOnInputPhase = false;
@@ -377,6 +451,8 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 		this.isInputPhase = false;
 		this.batchLaunches = false;
 		this.hasScoredThisRound = false;
+
+		this.roundCnt++;
 	}
 
 	private void initializeGame() {
@@ -384,6 +460,8 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 
 		this.teamRedScore = 0;
 		this.teamBlueScore = 0;
+
+		this.roundCnt = 0;
 
 		//assign teams
 		this.playerTeams.clear();
@@ -478,7 +556,56 @@ public class ServerRocketLeagueInterface extends ServerGameInterface {
 				break;
 			}
 		}
+	}
 
+	private void assignPegType(int pegID, int pegType) {
+		float mass = RocketLeagueState.pegTypeMasses.get(pegType);
+		this.pegs.get(pegID).setMass(mass);
+
+		this.pegTypes.put(pegID, pegType);
+		this.assignPegTypeList.add(new Pair<Integer, Integer>(pegID, pegType));
+	}
+
+	private int generatePowerupID() {
+		int id = 0;
+		while (id == 0 || this.powerups.containsKey(id)) {
+			id = (int) (Math.random() * 1000000);
+		}
+		return id;
+	}
+
+	private int addPowerup() {
+		//find location for powerup that doesn't collide with any pegs
+		Vec2 pos = new Vec2(0, 0);
+		float width = 40f;
+		float height = 20f;
+		int attCnt = 0;
+		while (attCnt < 100000) {
+			attCnt++;
+			pos = new Vec2((Math.random() * width) - width / 2, (Math.random() * height) - height / 2);
+			boolean isValid = true;
+			for (int pegID : this.pegs.keySet()) {
+				Vec2 pegPos = this.pegs.get(pegID).position;
+				float dist = pos.distance(pegPos);
+				if (dist < 2) {
+					isValid = false;
+					break;
+				}
+			}
+			if (isValid) {
+				break;
+			}
+			attCnt++;
+		}
+		int id = this.generatePowerupID();
+		this.powerups.put(id, new Pair<Vec2, Integer>(pos, RocketLeagueState.getRandomAdvancedPegType()));
+		this.addPowerupList.add(id);
+		return id;
+	}
+
+	private void removePowerup(int id) {
+		this.powerups.remove(id);
+		this.removePowerupList.add(id);
 	}
 
 	private int generatePegID() {
