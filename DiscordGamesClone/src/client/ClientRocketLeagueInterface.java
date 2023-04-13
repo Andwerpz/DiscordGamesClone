@@ -251,40 +251,40 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		}
 	}
 
-	public HashMap<Integer, Pair<Vec2, Integer>> getPowerups() {
+	public synchronized HashMap<Integer, Pair<Vec2, Integer>> getPowerups() {
 		return this.powerups;
 	}
 
-	public ArrayList<Integer> getAddedPowerups() {
+	public synchronized ArrayList<Integer> getAddedPowerups() {
 		ArrayList<Integer> ret = new ArrayList<>();
 		ret.addAll(this.addedPowerups);
 		this.addedPowerups.clear();
 		return ret;
 	}
 
-	public ArrayList<Integer> getRemovedPowerups() {
+	public synchronized ArrayList<Integer> getRemovedPowerups() {
 		ArrayList<Integer> ret = new ArrayList<>();
 		ret.addAll(this.removedPowerups);
 		this.removedPowerups.clear();
 		return ret;
 	}
 
-	public ArrayList<Integer> getUpdPegTypeList() {
+	public synchronized ArrayList<Integer> getUpdPegTypeList() {
 		ArrayList<Integer> ret = new ArrayList<>();
 		ret.addAll(this.updPegTypeList);
 		this.updPegTypeList.clear();
 		return ret;
 	}
 
-	public int getRedScore() {
+	public synchronized int getRedScore() {
 		return this.teamRedScore;
 	}
 
-	public int getBlueScore() {
+	public synchronized int getBlueScore() {
 		return this.teamBlueScore;
 	}
 
-	public boolean gameStarted() {
+	public synchronized boolean gameStarted() {
 		if (!this.gameStarted) {
 			return false;
 		}
@@ -292,7 +292,7 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		return true;
 	}
 
-	public boolean gameEnded() {
+	public synchronized boolean gameEnded() {
 		if (!this.gameEnded) {
 			return false;
 		}
@@ -300,25 +300,25 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		return true;
 	}
 
-	public boolean isInGame() {
+	public synchronized boolean isInGame() {
 		return this.isInGame;
 	}
 
-	public boolean inInputPhase() {
+	public synchronized boolean inInputPhase() {
 		return System.currentTimeMillis() < this.inputPhaseEndMillis;
 	}
 
-	public long getInputPhaseEndMillis() {
+	public synchronized long getInputPhaseEndMillis() {
 		return this.inputPhaseEndMillis;
 	}
 
-	public void startGame() {
+	public synchronized void startGame() {
 		if (this.client.isHost()) {
 			this.startGame = true;
 		}
 	}
 
-	public boolean hasNewTeamAssignment() {
+	public synchronized boolean hasNewTeamAssignment() {
 		if (!this.newTeamAssignment) {
 			return false;
 		}
@@ -326,43 +326,43 @@ public class ClientRocketLeagueInterface extends ClientGameInterface {
 		return true;
 	}
 
-	public HashMap<Integer, Integer> getPlayerTeams() {
+	public synchronized HashMap<Integer, Integer> getPlayerTeams() {
 		return this.playerTeams;
 	}
 
-	public HashMap<Integer, Vec2> getBatchedLaunches() {
+	public synchronized HashMap<Integer, Vec2> getBatchedLaunches() {
 		HashMap<Integer, Vec2> ret = new HashMap<>();
 		ret.putAll(this.incomingBatchedLaunches);
 		return ret;
 	}
 
-	public void writeLaunch(int pegID, Vec2 launchVec, boolean stillDragging) {
+	public synchronized void writeLaunch(int pegID, Vec2 launchVec, boolean stillDragging) {
 		this.writeLaunch = true;
 		this.launchPegID = pegID;
 		this.launchVec.set(launchVec);
 		this.launchStillDragging = stillDragging;
 	}
 
-	public HashMap<Integer, Body> getPegs() {
+	public synchronized HashMap<Integer, Body> getPegs() {
 		return this.pegs;
 	}
 
-	public HashMap<Integer, Integer> getPegToPlayer() {
+	public synchronized HashMap<Integer, Integer> getPegToPlayer() {
 		return this.pegToPlayer;
 	}
 
-	public HashMap<Integer, Integer> getPegTypes() {
+	public synchronized HashMap<Integer, Integer> getPegTypes() {
 		return this.pegTypes;
 	}
 
-	public HashSet<Integer> getAddedPegs() {
+	public synchronized HashSet<Integer> getAddedPegs() {
 		HashSet<Integer> ret = new HashSet<>();
 		ret.addAll(this.addedPegs);
 		this.addedPegs.clear();
 		return ret;
 	}
 
-	public HashSet<Integer> getRemovedPegs() {
+	public synchronized HashSet<Integer> getRemovedPegs() {
 		HashSet<Integer> ret = new HashSet<>();
 		ret.addAll(this.removedPegs);
 		this.removedPegs.clear();

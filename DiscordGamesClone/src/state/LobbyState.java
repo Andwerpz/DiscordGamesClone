@@ -128,6 +128,7 @@ public class LobbyState extends State {
 
 		if (this.hosting) {
 			this.ip = NetworkingUtils.getLocalIP();
+			this.ip = "192.168.0.13";
 		}
 
 		String adjective = defaultAdjectives[(int) (Math.random() * defaultAdjectives.length)];
