@@ -16,6 +16,7 @@ import org.lwjgl.openal.ALCCapabilities;
 import org.lwjgl.openal.ALCapabilities;
 
 import client.Client;
+import graphics.Framebuffer;
 import graphics.Shader;
 import input.KeyboardInput;
 import input.MouseInput;
@@ -61,6 +62,8 @@ public class Main implements Runnable {
 
 	private long audioContext;
 	private long audioDevice;
+
+	private Framebuffer outputBuffer;
 
 	public void start() {
 		running = true;
